@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PM Focus Screen — India Equities</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F9FAF9;
+    --card:#FFFFFF;
+    --ink:#14171A;
+    --sub:#5B6169;
+    --line:#E2E5E1;
+    --copper:#C1592B;
+    --copper-bg:#FBEDE6;
+    --teal:#2B6E63;
+    --teal-bg:#E8F1EF;
+    --ok:#2B6E63;
+    --warn:#B8792A;
+    --err:#B23A2E;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  .wrap{max-width:1040px;margin:0 auto;padding:0 16px 48px;}
+
+  /* ---- status strip (signature element) ---- */
+  .status-strip{
+    background:var(--ink);
+    color:#F4F5F3;
+    padding:10px 16px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+    letter-spacing:0.02em;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+    position:sticky;
+    top:0;
+    z-index:20;
+  }
+  .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .dot.ok{background:#4CAF9E;box-shadow:0 0 0 3px rgba(76,175,158,0.25);}
+  .dot.warn{background:#E0A64A;box-shadow:0 0 0 3px rgba(224,166,74,0.25);}
+  .dot.err{background:#E0685C;box-shadow:0 0 0 3px rgba(224,104,92,0.25);}
+  .status-sep{opacity:0.35;}
+  .status-strip .muted{opacity:0.65;}
+
+  header.page{padding:28px 16px 18px;}
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:26px;
+    margin:0 0 4px;
+    letter-spacing:-0.01em;
+  }
+  .subtitle{color:var(--sub);font-size:14px;margin:0;}
+
+  .warnings-box{
+    margin:0 16px 16px;
+    padding:12px 14px;
+    background:#FBF2E4;
+    border:1px solid #EFD9AE;
+    border-radius:var(--radius);
+    color:#7A5518;
+    font-size:13px;
+    line-height:1.5;
+  }
+  .warnings-box strong{display:block;font-family:'Space Grotesk',sans-serif;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:4px;color:#8A5F19;}
+
+  /* ---- tabs ---- */
+  .tabs{
+    display:flex;
+    gap:4px;
+    padding:0 16px;
+    margin-bottom:18px;
+    border-bottom:1px solid var(--line);
+  }
+  .tab-btn{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:14.5px;
+    background:none;
+    border:none;
+    padding:10px 4px;
+    margin-right:22px;
+    color:var(--sub);
+    cursor:pointer;
+    border-bottom:2px solid transparent;
+    transition:color .15s ease, border-color .15s ease;
+  }
+  .tab-btn.active{color:var(--ink);border-bottom-color:var(--ink);}
+  .tab-btn:hover{color:var(--ink);}
+
+  .panel{display:none;padding:0 16px;}
+  .panel.active{display:block;}
+
+  /* ---- desktop table ---- */
+  table{width:100%;border-collapse:collapse;background:var(--card);border-radius:var(--radius);overflow:hidden;box-shadow:0 1px 2px rgba(20,23,26,0.04);}
+  thead th{
+    text-align:left;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:11.5px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    color:var(--sub);
+    padding:12px 14px;
+    border-bottom:1px solid var(--line);
+    cursor:pointer;
+    white-space:nowrap;
+    user-select:none;
+  }
+  thead th:hover{color:var(--ink);}
+  thead th .arrow{opacity:0.4;margin-left:3px;font-size:10px;}
+  tbody td{
+    padding:11px 14px;
+    border-bottom:1px solid var(--line);
+    font-size:13.5px;
+    white-space:nowrap;
+  }
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:#F5F6F4;}
+  .num{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;}
+  .ticker{font-weight:600;}
+  .name-sub{display:block;color:var(--sub);font-size:11.5px;font-weight:400;margin-top:1px;}
+  .tag{
+    display:inline-block;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:11px;
+    font-weight:600;
+    padding:2px 8px;
+    border-radius:20px;
+  }
+  .tag.Explosive{background:var(--copper-bg);color:var(--copper);}
+  .tag.Gradual{background:var(--teal-bg);color:var(--teal);}
+  .score-cell{font-weight:600;}
+
+  /* ---- mobile cards ---- */
+  .cards{display:none;flex-direction:column;gap:10px;}
+  .card{
+    background:var(--card);
+    border-radius:var(--radius);
+    padding:14px 16px;
+    box-shadow:0 1px 2px rgba(20,23,26,0.05);
+  }
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .card-ticker{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16px;}
+  .card-name{color:var(--sub);font-size:12px;margin-top:2px;}
+  .card-score{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:20px;text-align:right;flex-shrink:0;}
+  .card-score-label{font-family:'Inter',sans-serif;font-weight:500;font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:0.04em;text-align:right;}
+  .card-meta{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:12px;color:var(--sub);}
+  .card-meta b{font-family:'IBM Plex Mono',monospace;color:var(--ink);font-weight:500;}
+
+  @media (max-width:680px){
+    table{display:none;}
+    .cards{display:flex;}
+    h1{font-size:22px;}
+  }
+
+  .empty-state{
+    padding:40px 20px;
+    text-align:center;
+    color:var(--sub);
+    font-size:14px;
+    background:var(--card);
+    border-radius:var(--radius);
+  }
+
+  .conv-bar-track{width:100%;height:6px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:4px;}
+  .conv-bar-fill{height:100%;background:var(--teal);border-radius:4px;}
+</style>
+</head>
+<body>
+
+<div class="status-strip" id="statusStrip">
+  <span class="dot ok" id="statusDot"></span>
+  <span id="statusText">Loading…</span>
+</div>
+
+<header class="page wrap">
+  <h1>PM Focus Screen</h1>
+  <p class="subtitle">India equities — constructive accumulation ranking</p>
+</header>
+
+<div id="warningsBox"></div>
+
+<div class="wrap">
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="focus">Focus Screen</button>
+    <button class="tab-btn" data-tab="conviction">Sub-Sector Conviction</button>
+  </div>
+
+  <div class="panel active" id="panel-focus">
+    <table id="focusTable">
+      <thead>
+        <tr>
+          <th data-key="Ticker">Ticker</th>
+          <th data-key="Sector">Sector</th>
+          <th data-key="Type">Type</th>
+          <th data-key="Price" class="num">Price</th>
+          <th data-key="Ratio" class="num">Ratio</th>
+          <th data-key="BaseDays" class="num">Base Days</th>
+          <th data-key="TrendQuality" class="num">Trend</th>
+          <th data-key="Absorption" class="num">Absorption</th>
+          <th data-key="FollowThrough" class="num">Follow-Thru</th>
+          <th data-key="PM_Score" class="num">PM Score</th>
+        </tr>
+      </thead>
+      <tbody id="focusBody"></tbody>
+    </table>
+    <div class="cards" id="focusCards"></div>
+  </div>
+
+  <div class="panel" id="panel-conviction">
+    <table id="convTable">
+      <thead>
+        <tr>
+          <th data-key="Sub_Sector">Sub-Sector</th>
+          <th data-key="sector">Sector</th>
+          <th data-key="breadth_pct" class="num">Breadth %</th>
+          <th data-key="avg_basedays" class="num">Avg Base Days</th>
+          <th data-key="conviction" class="num">Conviction</th>
+          <th data-key="top_stock">Top Stock</th>
+        </tr>
+      </thead>
+      <tbody id="convBody"></tbody>
+    </table>
+    <div class="cards" id="convCards"></div>
+  </div>
+</div>
+
+<script>
+const DATA_URL = "https://raw.githubusercontent.com/zeeshan141188-hash/india-equity-dashboard-output/main/latest.json";
+
+let focusData = [];
+let convData = [];
+let focusSort = { key: "PM_Score", dir: -1 };
+let convSort = { key: "conviction", dir: -1 };
+
+function fmt(n, d=2){
+  if(n === null || n === undefined || isNaN(n)) return "—";
+  return Number(n).toFixed(d);
+}
+
+async function loadData(){
+  try{
+    const res = await fetch(DATA_URL, {cache: "no-store"});
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const json = await res.json();
+    renderStatus(json);
+    focusData = json.top_ideas || [];
+    convData = json.subsector_conviction || [];
+    sortAndRenderFocus();
+    sortAndRenderConv();
+  }catch(err){
+    document.getElementById("statusDot").className = "dot err";
+    document.getElementById("statusText").textContent = "Could not load data — " + err.message;
+  }
+}
+
+function renderStatus(json){
+  const dot = document.getElementById("statusDot");
+  const text = document.getElementById("statusText");
+  const statusClass = json.status === "ok" ? "ok" : (json.status === "warning" ? "warn" : "err");
+  dot.className = "dot " + statusClass;
+  text.innerHTML = `${json.run_date_display || json.run_date} <span class="status-sep">·</span> `
+    + `<span class="muted">universe</span> ${json.universe_size} `
+    + `<span class="status-sep">·</span> <span class="muted">ideas</span> ${json.combined_count}`
+    + (json.status !== "ok" ? ` <span class="status-sep">·</span> ${json.status.toUpperCase()}` : "");
+
+  const wbox = document.getElementById("warningsBox");
+  if(json.warnings && json.warnings.length){
+    wbox.innerHTML = `<div class="warnings-box wrap"><strong>Flagged by pipeline</strong>${json.warnings.join("<br>")}</div>`;
+  } else {
+    wbox.innerHTML = "";
+  }
+}
+
+function sortRows(rows, sortState){
+  const {key, dir} = sortState;
+  return [...rows].sort((a,b)=>{
+    const av = a[key], bv = b[key];
+    if(typeof av === "string") return av.localeCompare(bv) * dir;
+    return ((av ?? -Infinity) - (bv ?? -Infinity)) * dir;
+  });
+}
+
+function sortAndRenderFocus(){
+  const rows = sortRows(focusData, focusSort);
+  const body = document.getElementById("focusBody");
+  const cards = document.getElementById("focusCards");
+
+  if(!rows.length){
+    body.innerHTML = "";
+    cards.innerHTML = '<div class="empty-state">No qualifying ideas in today\\'s run.</div>';
+    return;
+  }
+
+  body.innerHTML = rows.map(r => `
+    <tr>
+      <td class="ticker">${r.Ticker.replace(".NS","")}<span class="name-sub">${r.Name || ""}</span></td>
+      <td>${r.Sector}<span class="name-sub">${r.Sub_Sector || ""}</span></td>
+      <td><span class="tag ${r.Type}">${r.Type}</span></td>
+      <td class="num">₹${fmt(r.Price)}</td>
+      <td class="num">${fmt(r.Ratio, 3)}</td>
+      <td class="num">${r.BaseDays}</td>
+      <td class="num">${fmt(r.TrendQuality, 3)}</td>
+      <td class="num">${fmt(r.Absorption, 3)}</td>
+      <td class="num">${fmt(r.FollowThrough, 3)}</td>
+      <td class="num score-cell">${fmt(r.PM_Score, 3)}</td>
+    </tr>
+  `).join("");
+
+  cards.innerHTML = rows.map(r => `
+    <div class="card">
+      <div class="card-top">
+        <div>
+          <div class="card-ticker">${r.Ticker.replace(".NS","")}</div>
+          <div class="card-name">${r.Name || ""} · <span class="tag ${r.Type}">${r.Type}</span></div>
+        </div>
+        <div>
+          <div class="card-score">${fmt(r.PM_Score,3)}</div>
+          <div class="card-score-label">PM Score</div>
+        </div>
+      </div>
+      <div class="card-meta">
+        <span>Price <b>₹${fmt(r.Price)}</b></span>
+        <span>Ratio <b>${fmt(r.Ratio,3)}</b></span>
+        <span>Base Days <b>${r.BaseDays}</b></span>
+        <span>Trend <b>${fmt(r.TrendQuality,3)}</b></span>
+        <span>Absorption <b>${fmt(r.Absorption,3)}</b></span>
+        <span>Follow-Thru <b>${fmt(r.FollowThrough,3)}</b></span>
+      </div>
+    </div>
+  `).join("");
+}
+
+function sortAndRenderConv(){
+  const rows = sortRows(convData, convSort);
+  const body = document.getElementById("convBody");
+  const cards = document.getElementById("convCards");
+
+  if(!rows.length){
+    body.innerHTML = "";
+    cards.innerHTML = '<div class="empty-state">No sub-sector data in today\\'s run.</div>';
+    return;
+  }
+
+  body.innerHTML = rows.map(r => `
+    <tr>
+      <td class="ticker">${r.Sub_Sector}</td>
+      <td>${r.sector}</td>
+      <td class="num">${fmt(r.breadth_pct,1)}%</td>
+      <td class="num">${fmt(r.avg_basedays,0)}</td>
+      <td class="num score-cell">${fmt(r.conviction,1)}</td>
+      <td>${(r.top_stock||"").replace(".NS","")}</td>
+    </tr>
+  `).join("");
+
+  cards.innerHTML = rows.map(r => `
+    <div class="card">
+      <div class="card-top">
+        <div>
+          <div class="card-ticker">${r.Sub_Sector}</div>
+          <div class="card-name">${r.sector} · top: ${(r.top_stock||"").replace(".NS","")}</div>
+        </div>
+        <div>
+          <div class="card-score">${fmt(r.conviction,1)}</div>
+          <div class="card-score-label">Conviction</div>
+        </div>
+      </div>
+      <div class="conv-bar-track"><div class="conv-bar-fill" style="width:${Math.min(r.conviction,100)}%"></div></div>
+      <div class="card-meta" style="margin-top:8px;">
+        <span>Breadth <b>${fmt(r.breadth_pct,1)}%</b></span>
+        <span>Avg Base Days <b>${fmt(r.avg_basedays,0)}</b></span>
+      </div>
+    </div>
+  `).join("");
+}
+
+document.querySelectorAll(".tab-btn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("panel-" + btn.dataset.tab).classList.add("active");
+  });
+});
+
+document.querySelectorAll("#focusTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    focusSort.dir = (focusSort.key === key) ? -focusSort.dir : -1;
+    focusSort.key = key;
+    sortAndRenderFocus();
+  });
+});
+
+document.querySelectorAll("#convTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    convSort.dir = (convSort.key === key) ? -convSort.dir : -1;
+    convSort.key = key;
+    sortAndRenderConv();
+  });
+});
+
+loadData();
+</script>
+</body>
+</html>
