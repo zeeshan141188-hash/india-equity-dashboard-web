@@ -19,6 +19,8 @@
     --teal-bg:#E8F1EF;
     --violet:#5B4B8A;
     --violet-bg:#EFEBF7;
+    --gold:#A8842B;
+    --gold-bg:#FBF3DE;
     --ok:#2B6E63;
     --warn:#B8792A;
     --err:#B23A2E;
@@ -130,6 +132,8 @@
   }
   tbody tr:last-child td{border-bottom:none;}
   tbody tr:hover{background:#F5F6F4;}
+  tbody tr.top5-row{background:var(--gold-bg);}
+  tbody tr.top5-row:hover{background:#F5EAC9;}
   .num{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;}
   .ticker{font-weight:600;}
   .name-sub{display:block;color:var(--sub);font-size:11.5px;font-weight:400;margin-top:1px;}
@@ -147,6 +151,7 @@
   .tag.Persistence{background:var(--teal-bg);color:var(--teal);}
   .tag.Expansion{background:var(--violet-bg);color:var(--violet);}
   .tag.DQ{background:#EAF1FB;color:#2E5A9C;}
+  .tag.Top5Badge{background:var(--gold-bg);color:var(--gold);}
   .score-cell{font-weight:600;}
 
   .disp-subhead{
@@ -168,6 +173,19 @@
   .pillar-bar-fill.expansion{background:var(--violet);}
   .pillar-bar-fill.dq{background:#2E5A9C;}
 
+  .high-badges{display:flex;gap:4px;flex-wrap:wrap;}
+  .high-badge{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    font-weight:600;
+    padding:1px 6px;
+    border-radius:4px;
+    background:var(--line);
+    color:var(--sub);
+  }
+  .high-badge.active{background:var(--teal-bg);color:var(--teal);}
+  .high-badge.active-52{background:var(--gold-bg);color:var(--gold);}
+
   .cards{display:none;flex-direction:column;gap:10px;}
   .card{
     background:var(--card);
@@ -175,6 +193,7 @@
     padding:14px 16px;
     box-shadow:0 1px 2px rgba(20,23,26,0.05);
   }
+  .card.top5-card{background:var(--gold-bg);box-shadow:0 1px 2px rgba(168,132,43,0.15);}
   .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
   .card-ticker{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16px;}
   .card-name{color:var(--sub);font-size:12px;margin-top:2px;}
@@ -222,6 +241,7 @@
     <button class="tab-btn" data-tab="conviction">Sub-Sector Conviction</button>
     <button class="tab-btn" data-tab="displacement">Displacement Scanner</button>
     <button class="tab-btn" data-tab="theme">Theme Conviction</button>
+    <button class="tab-btn" data-tab="rrg">Sector Rotation</button>
   </div>
 
   <div class="panel active" id="panel-focus">
@@ -336,6 +356,25 @@
     </table>
     <div class="cards" id="themeCards"></div>
   </div>
+
+  <div class="panel" id="panel-rrg">
+    <div class="disp-subhead">Sub-Sector Relative Rotation — vs 800cr+ Universe · Top 5 Highlighted</div>
+    <table id="rrgTable">
+      <thead>
+        <tr>
+          <th data-key="Sub_Sector">Sub-Sector</th>
+          <th data-key="Sector">Sector</th>
+          <th data-key="Constituents" class="num">Stocks</th>
+          <th data-key="rs_ratio" class="num">RS Ratio</th>
+          <th data-key="mom_4w_pct" class="num">4w Mom %</th>
+          <th data-key="struct_rank_display">Structural High</th>
+          <th data-key="Combined_Score" class="num">Score</th>
+        </tr>
+      </thead>
+      <tbody id="rrgBody"></tbody>
+    </table>
+    <div class="cards" id="rrgCards"></div>
+  </div>
 </div>
 
 <script>
@@ -347,12 +386,14 @@ let dispUpData = [];
 let dispDnData = [];
 let dispSectorData = [];
 let themeData = [];
+let rrgData = [];
 let focusSort = { key: "PM_Score", dir: -1 };
 let convSort = { key: "conviction", dir: -1 };
 let dispUpSort = { key: "Score", dir: -1 };
 let dispDnSort = { key: "Score", dir: -1 };
 let dispSectorSort = { key: "Conviction", dir: -1 };
 let themeSort = { key: "Conviction", dir: -1 };
+let rrgSort = { key: "Combined_Score", dir: -1 };
 
 function fmt(n, d=2){
   if(n === null || n === undefined || isNaN(n)) return "—";
@@ -373,10 +414,13 @@ async function loadData(){
     dispSectorData = disp.sector_conviction || [];
     const theme = json.theme_conviction || {};
     themeData = theme.themes || [];
+    const rrg = json.sector_rrg || {};
+    rrgData = rrg.sub_sectors || [];
     sortAndRenderFocus();
     sortAndRenderConv();
     sortAndRenderDisp();
     sortAndRenderTheme();
+    sortAndRenderRRG();
   }catch(err){
     document.getElementById("statusDot").className = "dot err";
     document.getElementById("statusText").textContent = "Could not load data — " + err.message;
@@ -406,6 +450,7 @@ function sortRows(rows, sortState){
   return [...rows].sort((a,b)=>{
     const av = a[key], bv = b[key];
     if(typeof av === "string") return av.localeCompare(bv) * dir;
+    if(typeof av === "boolean") return ((av === bv) ? 0 : (av ? 1 : -1)) * dir;
     const an = (av === null || av === undefined || isNaN(av)) ? -Infinity : av;
     const bn = (bv === null || bv === undefined || isNaN(bv)) ? -Infinity : bv;
     return (an - bn) * dir;
@@ -643,6 +688,69 @@ function sortAndRenderTheme(){
   `).join("");
 }
 
+function highBadges(r){
+  // Only show the HIGHEST tier reached, since is_26w_high implies clearing 13w too
+  // in practice for most rows, but we display all three for full transparency.
+  const b13 = r.is_13w_high ? "active" : "";
+  const b26 = r.is_26w_high ? "active" : "";
+  const b52 = r.is_52w_high ? "active-52" : "";
+  return `<div class="high-badges">
+    <span class="high-badge ${b13}">13w</span>
+    <span class="high-badge ${b26}">26w</span>
+    <span class="high-badge ${b52}">52w</span>
+  </div>`;
+}
+
+function sortAndRenderRRG(){
+  // struct_rank_display is a synthetic sort key: 52w > 26w > 13w > none
+  rrgData.forEach(r => {
+    r.struct_rank_display = r.is_52w_high ? 3 : r.is_26w_high ? 2 : r.is_13w_high ? 1 : 0;
+  });
+  const rows = sortRows(rrgData, rrgSort.key === "struct_rank_display"
+    ? { key: "struct_rank_display", dir: rrgSort.dir }
+    : rrgSort);
+  const body = document.getElementById("rrgBody");
+  const cards = document.getElementById("rrgCards");
+
+  if(!rows.length){
+    body.innerHTML = "";
+    cards.innerHTML = '<div class="empty-state">No sector rotation data in today\'s run.</div>';
+    return;
+  }
+
+  body.innerHTML = rows.map(r => `
+    <tr class="${r.Top5 ? 'top5-row' : ''}">
+      <td class="ticker">${r.Sub_Sector}${r.Top5 ? ' <span class="tag Top5Badge">TOP 5</span>' : ''}</td>
+      <td>${r.Sector}</td>
+      <td class="num">${r.Constituents}</td>
+      <td class="num">${fmt(r.rs_ratio,3)}</td>
+      <td class="num">${r.mom_4w_pct >= 0 ? '+' : ''}${fmt(r.mom_4w_pct,2)}%</td>
+      <td>${highBadges(r)}</td>
+      <td class="num score-cell">${fmt(r.Combined_Score,1)}</td>
+    </tr>
+  `).join("");
+
+  cards.innerHTML = rows.map(r => `
+    <div class="card ${r.Top5 ? 'top5-card' : ''}">
+      <div class="card-top">
+        <div>
+          <div class="card-ticker">${r.Sub_Sector}${r.Top5 ? ' <span class="tag Top5Badge">TOP 5</span>' : ''}</div>
+          <div class="card-name">${r.Sector} · ${r.Constituents} stocks</div>
+        </div>
+        <div>
+          <div class="card-score">${fmt(r.Combined_Score,1)}</div>
+          <div class="card-score-label">Score</div>
+        </div>
+      </div>
+      ${highBadges(r)}
+      <div class="card-meta" style="margin-top:8px;">
+        <span>RS Ratio <b>${fmt(r.rs_ratio,3)}</b></span>
+        <span>4w Mom <b>${r.mom_4w_pct >= 0 ? '+' : ''}${fmt(r.mom_4w_pct,2)}%</b></span>
+      </div>
+    </div>
+  `).join("");
+}
+
 document.querySelectorAll(".tab-btn").forEach(btn=>{
   btn.addEventListener("click", ()=>{
     document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
@@ -703,6 +811,15 @@ document.querySelectorAll("#themeTable thead th").forEach(th=>{
     themeSort.dir = (themeSort.key === key) ? -themeSort.dir : -1;
     themeSort.key = key;
     sortAndRenderTheme();
+  });
+});
+
+document.querySelectorAll("#rrgTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    rrgSort.dir = (rrgSort.key === key) ? -rrgSort.dir : -1;
+    rrgSort.key = key;
+    sortAndRenderRRG();
   });
 });
 
