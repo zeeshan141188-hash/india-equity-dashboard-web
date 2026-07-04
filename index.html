@@ -85,6 +85,7 @@
     padding:0 16px;
     margin-bottom:18px;
     border-bottom:1px solid var(--line);
+    flex-wrap:wrap;
   }
   .tab-btn{
     font-family:'Space Grotesk',sans-serif;
@@ -145,6 +146,18 @@
   .tag.Gradual{background:var(--teal-bg);color:var(--teal);}
   .score-cell{font-weight:600;}
 
+  /* ---- displacement scanner subheadings ---- */
+  .disp-subhead{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    color:var(--sub);
+    margin:22px 0 8px;
+  }
+  .disp-subhead:first-child{margin-top:0;}
+
   /* ---- mobile cards ---- */
   .cards{display:none;flex-direction:column;gap:10px;}
   .card{
@@ -198,6 +211,7 @@
   <div class="tabs">
     <button class="tab-btn active" data-tab="focus">Focus Screen</button>
     <button class="tab-btn" data-tab="conviction">Sub-Sector Conviction</button>
+    <button class="tab-btn" data-tab="displacement">Displacement Scanner</button>
   </div>
 
   <div class="panel active" id="panel-focus">
@@ -237,6 +251,61 @@
     </table>
     <div class="cards" id="convCards"></div>
   </div>
+
+  <div class="panel" id="panel-displacement">
+    <div class="disp-subhead">Structural Breaks — Up</div>
+    <table id="dispUpTable">
+      <thead>
+        <tr>
+          <th data-key="Ticker">Ticker</th>
+          <th data-key="Sector">Sector</th>
+          <th data-key="Price" class="num">Price</th>
+          <th data-key="Displacement_Z" class="num">Disp Z</th>
+          <th data-key="Volume_Z" class="num">Vol Z</th>
+          <th data-key="Structural_Level">Level</th>
+          <th data-key="Score" class="num">Score</th>
+          <th data-key="Decile" class="num">Decile</th>
+        </tr>
+      </thead>
+      <tbody id="dispUpBody"></tbody>
+    </table>
+    <div class="cards" id="dispUpCards"></div>
+
+    <div class="disp-subhead">Structural Breaks — Down</div>
+    <table id="dispDnTable">
+      <thead>
+        <tr>
+          <th data-key="Ticker">Ticker</th>
+          <th data-key="Sector">Sector</th>
+          <th data-key="Price" class="num">Price</th>
+          <th data-key="Displacement_Z" class="num">Disp Z</th>
+          <th data-key="Volume_Z" class="num">Vol Z</th>
+          <th data-key="Structural_Level">Level</th>
+          <th data-key="Score" class="num">Score</th>
+          <th data-key="Decile" class="num">Decile</th>
+        </tr>
+      </thead>
+      <tbody id="dispDnBody"></tbody>
+    </table>
+    <div class="cards" id="dispDnCards"></div>
+
+    <div class="disp-subhead">Sector Conviction</div>
+    <table id="dispSectorTable">
+      <thead>
+        <tr>
+          <th data-key="Sector">Sector</th>
+          <th data-key="Stocks" class="num">Stocks</th>
+          <th data-key="Bull_Exp_Pct" class="num">Bull %</th>
+          <th data-key="Bear_Exp_Pct" class="num">Bear %</th>
+          <th data-key="Density_Z" class="num">Density Z</th>
+          <th data-key="Conviction" class="num">Conviction</th>
+          <th data-key="Top_Horse">Top Stock</th>
+        </tr>
+      </thead>
+      <tbody id="dispSectorBody"></tbody>
+    </table>
+    <div class="cards" id="dispSectorCards"></div>
+  </div>
 </div>
 
 <script>
@@ -244,8 +313,14 @@ const DATA_URL = "https://raw.githubusercontent.com/zeeshan141188-hash/india-equ
 
 let focusData = [];
 let convData = [];
+let dispUpData = [];
+let dispDnData = [];
+let dispSectorData = [];
 let focusSort = { key: "PM_Score", dir: -1 };
 let convSort = { key: "conviction", dir: -1 };
+let dispUpSort = { key: "Score", dir: -1 };
+let dispDnSort = { key: "Score", dir: -1 };
+let dispSectorSort = { key: "Conviction", dir: -1 };
 
 function fmt(n, d=2){
   if(n === null || n === undefined || isNaN(n)) return "—";
@@ -260,8 +335,13 @@ async function loadData(){
     renderStatus(json);
     focusData = json.top_ideas || [];
     convData = json.subsector_conviction || [];
+    const disp = json.displacement || {};
+    dispUpData = disp.top_up || [];
+    dispDnData = disp.top_down || [];
+    dispSectorData = disp.sector_conviction || [];
     sortAndRenderFocus();
     sortAndRenderConv();
+    sortAndRenderDisp();
   }catch(err){
     document.getElementById("statusDot").className = "dot err";
     document.getElementById("statusText").textContent = "Could not load data — " + err.message;
@@ -291,7 +371,9 @@ function sortRows(rows, sortState){
   return [...rows].sort((a,b)=>{
     const av = a[key], bv = b[key];
     if(typeof av === "string") return av.localeCompare(bv) * dir;
-    return ((av ?? -Infinity) - (bv ?? -Infinity)) * dir;
+    const an = (av === null || av === undefined || isNaN(av)) ? -Infinity : av;
+    const bn = (bv === null || bv === undefined || isNaN(bv)) ? -Infinity : bv;
+    return (an - bn) * dir;
   });
 }
 
@@ -388,6 +470,91 @@ function sortAndRenderConv(){
   `).join("");
 }
 
+function renderDispTable(rows, bodyId, cardsId, kind){
+  const body = document.getElementById(bodyId);
+  const cards = document.getElementById(cardsId);
+
+  if(!rows.length){
+    body.innerHTML = "";
+    cards.innerHTML = `<div class="empty-state">No ${kind} data in today's run.</div>`;
+    return;
+  }
+
+  if(kind === "sector conviction"){
+    body.innerHTML = rows.map(r => `
+      <tr>
+        <td class="ticker">${r.Sector}</td>
+        <td class="num">${r.Stocks}</td>
+        <td class="num">${fmt(r.Bull_Exp_Pct,1)}%</td>
+        <td class="num">${fmt(r.Bear_Exp_Pct,1)}%</td>
+        <td class="num">${fmt(r.Density_Z,2)}</td>
+        <td class="num score-cell">${fmt(r.Conviction,1)}</td>
+        <td>${(r.Top_Horse||"").replace(".NS","").replace(".BO","")}</td>
+      </tr>
+    `).join("");
+    cards.innerHTML = rows.map(r => `
+      <div class="card">
+        <div class="card-top">
+          <div>
+            <div class="card-ticker">${r.Sector}</div>
+            <div class="card-name">top: ${(r.Top_Horse||"").replace(".NS","").replace(".BO","")}</div>
+          </div>
+          <div>
+            <div class="card-score">${fmt(r.Conviction,1)}</div>
+            <div class="card-score-label">Conviction</div>
+          </div>
+        </div>
+        <div class="card-meta">
+          <span>Bull <b>${fmt(r.Bull_Exp_Pct,1)}%</b></span>
+          <span>Bear <b>${fmt(r.Bear_Exp_Pct,1)}%</b></span>
+          <span>Density Z <b>${fmt(r.Density_Z,2)}</b></span>
+        </div>
+      </div>
+    `).join("");
+    return;
+  }
+
+  body.innerHTML = rows.map(r => `
+    <tr>
+      <td class="ticker">${r.Ticker.replace(".NS","").replace(".BO","")}</td>
+      <td>${r.Sector}<span class="name-sub">${r.Sub_Sector || ""}</span></td>
+      <td class="num">₹${fmt(r.Price)}</td>
+      <td class="num">${fmt(r.Displacement_Z,2)}</td>
+      <td class="num">${fmt(r.Volume_Z,2)}</td>
+      <td>${r.Structural_Level !== "None" ? r.Structural_Level : "—"}</td>
+      <td class="num score-cell">${fmt(r.Score,3)}</td>
+      <td class="num">${fmt(r.Decile,3)}</td>
+    </tr>
+  `).join("");
+
+  cards.innerHTML = rows.map(r => `
+    <div class="card">
+      <div class="card-top">
+        <div>
+          <div class="card-ticker">${r.Ticker.replace(".NS","").replace(".BO","")}</div>
+          <div class="card-name">${r.Sector}${r.Structural_Level !== "None" ? " · " + r.Structural_Level : ""}</div>
+        </div>
+        <div>
+          <div class="card-score">${fmt(r.Score,3)}</div>
+          <div class="card-score-label">Score</div>
+        </div>
+      </div>
+      <div class="card-meta">
+        <span>Price <b>₹${fmt(r.Price)}</b></span>
+        <span>Disp Z <b>${fmt(r.Displacement_Z,2)}</b></span>
+        <span>Vol Z <b>${fmt(r.Volume_Z,2)}</b></span>
+        <span>Decile <b>${fmt(r.Decile,3)}</b></span>
+      </div>
+    </div>
+  `).join("");
+}
+
+function sortAndRenderDisp(){
+  renderDispTable(sortRows(dispUpData, dispUpSort), "dispUpBody", "dispUpCards", "up displacement");
+  renderDispTable(sortRows(dispDnData, dispDnSort), "dispDnBody", "dispDnCards", "down displacement");
+  renderDispTable(sortRows(dispSectorData, dispSectorSort), "dispSectorBody", "dispSectorCards", "sector conviction");
+}
+
 document.querySelectorAll(".tab-btn").forEach(btn=>{
   btn.addEventListener("click", ()=>{
     document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
@@ -412,6 +579,33 @@ document.querySelectorAll("#convTable thead th").forEach(th=>{
     convSort.dir = (convSort.key === key) ? -convSort.dir : -1;
     convSort.key = key;
     sortAndRenderConv();
+  });
+});
+
+document.querySelectorAll("#dispUpTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    dispUpSort.dir = (dispUpSort.key === key) ? -dispUpSort.dir : -1;
+    dispUpSort.key = key;
+    sortAndRenderDisp();
+  });
+});
+
+document.querySelectorAll("#dispDnTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    dispDnSort.dir = (dispDnSort.key === key) ? -dispDnSort.dir : -1;
+    dispDnSort.key = key;
+    sortAndRenderDisp();
+  });
+});
+
+document.querySelectorAll("#dispSectorTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    dispSectorSort.dir = (dispSectorSort.key === key) ? -dispSectorSort.dir : -1;
+    dispSectorSort.key = key;
+    sortAndRenderDisp();
   });
 });
 
