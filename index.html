@@ -370,3 +370,343 @@ async function loadData(){
     const disp = json.displacement || {};
     dispUpData = disp.top_up || [];
     dispDnData = disp.top_down || [];
+    dispSectorData = disp.sector_conviction || [];
+    const theme = json.theme_conviction || {};
+    themeData = theme.themes || [];
+    sortAndRenderFocus();
+    sortAndRenderConv();
+    sortAndRenderDisp();
+    sortAndRenderTheme();
+  }catch(err){
+    document.getElementById("statusDot").className = "dot err";
+    document.getElementById("statusText").textContent = "Could not load data — " + err.message;
+  }
+}
+
+function renderStatus(json){
+  const dot = document.getElementById("statusDot");
+  const text = document.getElementById("statusText");
+  const statusClass = json.status === "ok" ? "ok" : (json.status === "warning" ? "warn" : "err");
+  dot.className = "dot " + statusClass;
+  text.innerHTML = `${json.run_date_display || json.run_date} <span class="status-sep">·</span> `
+    + `<span class="muted">universe</span> ${json.universe_size} `
+    + `<span class="status-sep">·</span> <span class="muted">ideas</span> ${json.combined_count}`
+    + (json.status !== "ok" ? ` <span class="status-sep">·</span> ${json.status.toUpperCase()}` : "");
+
+  const wbox = document.getElementById("warningsBox");
+  if(json.warnings && json.warnings.length){
+    wbox.innerHTML = `<div class="warnings-box wrap"><strong>Flagged by pipeline</strong>${json.warnings.join("<br>")}</div>`;
+  } else {
+    wbox.innerHTML = "";
+  }
+}
+
+function sortRows(rows, sortState){
+  const {key, dir} = sortState;
+  return [...rows].sort((a,b)=>{
+    const av = a[key], bv = b[key];
+    if(typeof av === "string") return av.localeCompare(bv) * dir;
+    const an = (av === null || av === undefined || isNaN(av)) ? -Infinity : av;
+    const bn = (bv === null || bv === undefined || isNaN(bv)) ? -Infinity : bv;
+    return (an - bn) * dir;
+  });
+}
+
+function sortAndRenderFocus(){
+  const rows = sortRows(focusData, focusSort);
+  const body = document.getElementById("focusBody");
+  const cards = document.getElementById("focusCards");
+
+  if(!rows.length){
+    body.innerHTML = "";
+    cards.innerHTML = '<div class="empty-state">No qualifying ideas in today\'s run.</div>';
+    return;
+  }
+
+  body.innerHTML = rows.map(r => `
+    <tr>
+      <td class="ticker">${r.Ticker.replace(".NS","")}<span class="name-sub">${r.Name || ""}</span></td>
+      <td>${r.Sector}<span class="name-sub">${r.Sub_Sector || ""}</span></td>
+      <td><span class="tag ${r.Type}">${r.Type}</span></td>
+      <td class="num">₹${fmt(r.Price)}</td>
+      <td class="num">${fmt(r.Ratio, 3)}</td>
+      <td class="num">${r.BaseDays}</td>
+      <td class="num">${fmt(r.TrendQuality, 3)}</td>
+      <td class="num">${fmt(r.Absorption, 3)}</td>
+      <td class="num">${fmt(r.FollowThrough, 3)}</td>
+      <td class="num score-cell">${fmt(r.PM_Score, 3)}</td>
+    </tr>
+  `).join("");
+
+  cards.innerHTML = rows.map(r => `
+    <div class="card">
+      <div class="card-top">
+        <div>
+          <div class="card-ticker">${r.Ticker.replace(".NS","")}</div>
+          <div class="card-name">${r.Name || ""} · <span class="tag ${r.Type}">${r.Type}</span></div>
+        </div>
+        <div>
+          <div class="card-score">${fmt(r.PM_Score,3)}</div>
+          <div class="card-score-label">PM Score</div>
+        </div>
+      </div>
+      <div class="card-meta">
+        <span>Price <b>₹${fmt(r.Price)}</b></span>
+        <span>Ratio <b>${fmt(r.Ratio,3)}</b></span>
+        <span>Base Days <b>${r.BaseDays}</b></span>
+        <span>Trend <b>${fmt(r.TrendQuality,3)}</b></span>
+        <span>Absorption <b>${fmt(r.Absorption,3)}</b></span>
+        <span>Follow-Thru <b>${fmt(r.FollowThrough,3)}</b></span>
+      </div>
+    </div>
+  `).join("");
+}
+
+function sortAndRenderConv(){
+  const rows = sortRows(convData, convSort);
+  const body = document.getElementById("convBody");
+  const cards = document.getElementById("convCards");
+
+  if(!rows.length){
+    body.innerHTML = "";
+    cards.innerHTML = '<div class="empty-state">No sub-sector data in today\'s run.</div>';
+    return;
+  }
+
+  body.innerHTML = rows.map(r => `
+    <tr>
+      <td class="ticker">${r.Sub_Sector}</td>
+      <td>${r.sector}</td>
+      <td class="num">${fmt(r.breadth_pct,1)}%</td>
+      <td class="num">${fmt(r.avg_basedays,0)}</td>
+      <td class="num score-cell">${fmt(r.conviction,1)}</td>
+      <td>${(r.top_stock||"").replace(".NS","")}</td>
+    </tr>
+  `).join("");
+
+  cards.innerHTML = rows.map(r => `
+    <div class="card">
+      <div class="card-top">
+        <div>
+          <div class="card-ticker">${r.Sub_Sector}</div>
+          <div class="card-name">${r.sector} · top: ${(r.top_stock||"").replace(".NS","")}</div>
+        </div>
+        <div>
+          <div class="card-score">${fmt(r.conviction,1)}</div>
+          <div class="card-score-label">Conviction</div>
+        </div>
+      </div>
+      <div class="conv-bar-track"><div class="conv-bar-fill" style="width:${Math.min(r.conviction,100)}%"></div></div>
+      <div class="card-meta" style="margin-top:8px;">
+        <span>Breadth <b>${fmt(r.breadth_pct,1)}%</b></span>
+        <span>Avg Base Days <b>${fmt(r.avg_basedays,0)}</b></span>
+      </div>
+    </div>
+  `).join("");
+}
+
+function renderDispTable(rows, bodyId, cardsId, kind){
+  const body = document.getElementById(bodyId);
+  const cards = document.getElementById(cardsId);
+
+  if(!rows.length){
+    body.innerHTML = "";
+    cards.innerHTML = `<div class="empty-state">No ${kind} data in today's run.</div>`;
+    return;
+  }
+
+  if(kind === "sector conviction"){
+    body.innerHTML = rows.map(r => `
+      <tr>
+        <td class="ticker">${r.Sector}</td>
+        <td class="num">${r.Stocks}</td>
+        <td class="num">${fmt(r.Bull_Exp_Pct,1)}%</td>
+        <td class="num">${fmt(r.Bear_Exp_Pct,1)}%</td>
+        <td class="num">${fmt(r.Density_Z,2)}</td>
+        <td class="num score-cell">${fmt(r.Conviction,1)}</td>
+        <td>${(r.Top_Horse||"").replace(".NS","").replace(".BO","")}</td>
+      </tr>
+    `).join("");
+    cards.innerHTML = rows.map(r => `
+      <div class="card">
+        <div class="card-top">
+          <div>
+            <div class="card-ticker">${r.Sector}</div>
+            <div class="card-name">top: ${(r.Top_Horse||"").replace(".NS","").replace(".BO","")}</div>
+          </div>
+          <div>
+            <div class="card-score">${fmt(r.Conviction,1)}</div>
+            <div class="card-score-label">Conviction</div>
+          </div>
+        </div>
+        <div class="card-meta">
+          <span>Bull <b>${fmt(r.Bull_Exp_Pct,1)}%</b></span>
+          <span>Bear <b>${fmt(r.Bear_Exp_Pct,1)}%</b></span>
+          <span>Density Z <b>${fmt(r.Density_Z,2)}</b></span>
+        </div>
+      </div>
+    `).join("");
+    return;
+  }
+
+  body.innerHTML = rows.map(r => `
+    <tr>
+      <td class="ticker">${r.Ticker.replace(".NS","").replace(".BO","")}</td>
+      <td>${r.Sector}<span class="name-sub">${r.Sub_Sector || ""}</span></td>
+      <td class="num">₹${fmt(r.Price)}</td>
+      <td class="num">${fmt(r.Displacement_Z,2)}</td>
+      <td class="num">${fmt(r.Volume_Z,2)}</td>
+      <td>${r.Structural_Level !== "None" ? r.Structural_Level : "—"}</td>
+      <td class="num score-cell">${fmt(r.Score,3)}</td>
+      <td class="num">${fmt(r.Decile,3)}</td>
+    </tr>
+  `).join("");
+
+  cards.innerHTML = rows.map(r => `
+    <div class="card">
+      <div class="card-top">
+        <div>
+          <div class="card-ticker">${r.Ticker.replace(".NS","").replace(".BO","")}</div>
+          <div class="card-name">${r.Sector}${r.Structural_Level !== "None" ? " · " + r.Structural_Level : ""}</div>
+        </div>
+        <div>
+          <div class="card-score">${fmt(r.Score,3)}</div>
+          <div class="card-score-label">Score</div>
+        </div>
+      </div>
+      <div class="card-meta">
+        <span>Price <b>₹${fmt(r.Price)}</b></span>
+        <span>Disp Z <b>${fmt(r.Displacement_Z,2)}</b></span>
+        <span>Vol Z <b>${fmt(r.Volume_Z,2)}</b></span>
+        <span>Decile <b>${fmt(r.Decile,3)}</b></span>
+      </div>
+    </div>
+  `).join("");
+}
+
+function sortAndRenderDisp(){
+  renderDispTable(sortRows(dispUpData, dispUpSort), "dispUpBody", "dispUpCards", "up displacement");
+  renderDispTable(sortRows(dispDnData, dispDnSort), "dispDnBody", "dispDnCards", "down displacement");
+  renderDispTable(sortRows(dispSectorData, dispSectorSort), "dispSectorBody", "dispSectorCards", "sector conviction");
+}
+
+function sortAndRenderTheme(){
+  const rows = sortRows(themeData, themeSort);
+  const body = document.getElementById("themeBody");
+  const cards = document.getElementById("themeCards");
+
+  if(!rows.length){
+    body.innerHTML = "";
+    cards.innerHTML = '<div class="empty-state">No theme conviction data in today\'s run.</div>';
+    return;
+  }
+
+  body.innerHTML = rows.map(r => `
+    <tr>
+      <td class="ticker">${r.Sub_Sector}</td>
+      <td class="num">${r.Stocks}</td>
+      <td class="num">${fmt(r.Momentum,1)}</td>
+      <td class="num">${fmt(r.Persistence,1)}</td>
+      <td class="num">${fmt(r.Expansion,1)}</td>
+      <td class="num">${fmt(r.DQ,1)}</td>
+      <td class="num score-cell">${fmt(r.Conviction,1)}</td>
+      <td><span class="tag ${r.Driver}">${r.Driver}</span></td>
+      <td>${(r.Lead_Stock||"").replace(".NS","").replace(".BO","")}</td>
+    </tr>
+  `).join("");
+
+  cards.innerHTML = rows.map(r => `
+    <div class="card">
+      <div class="card-top">
+        <div>
+          <div class="card-ticker">${r.Sub_Sector}</div>
+          <div class="card-name">${r.Stocks} stocks · <span class="tag ${r.Driver}">${r.Driver}</span> driven · lead: ${(r.Lead_Stock||"").replace(".NS","").replace(".BO","")}</div>
+        </div>
+        <div>
+          <div class="card-score">${fmt(r.Conviction,1)}</div>
+          <div class="card-score-label">Conviction</div>
+        </div>
+      </div>
+      <div class="pillar-bars">
+        <div class="pillar-bar" title="Momentum ${fmt(r.Momentum,1)}"><div class="pillar-bar-fill momentum" style="width:${Math.min(r.Momentum,100)}%"></div></div>
+        <div class="pillar-bar" title="Persistence ${fmt(r.Persistence,1)}"><div class="pillar-bar-fill persistence" style="width:${Math.min(r.Persistence,100)}%"></div></div>
+        <div class="pillar-bar" title="Expansion ${fmt(r.Expansion,1)}"><div class="pillar-bar-fill expansion" style="width:${Math.min(r.Expansion,100)}%"></div></div>
+        <div class="pillar-bar" title="DQ ${fmt(r.DQ,1)}"><div class="pillar-bar-fill dq" style="width:${Math.min(r.DQ,100)}%"></div></div>
+      </div>
+      <div class="card-meta" style="margin-top:8px;">
+        <span>Momentum <b>${fmt(r.Momentum,1)}</b></span>
+        <span>Persist <b>${fmt(r.Persistence,1)}</b></span>
+        <span>Expand <b>${fmt(r.Expansion,1)}</b></span>
+        <span>DQ <b>${fmt(r.DQ,1)}</b></span>
+      </div>
+    </div>
+  `).join("");
+}
+
+document.querySelectorAll(".tab-btn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("panel-" + btn.dataset.tab).classList.add("active");
+  });
+});
+
+document.querySelectorAll("#focusTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    focusSort.dir = (focusSort.key === key) ? -focusSort.dir : -1;
+    focusSort.key = key;
+    sortAndRenderFocus();
+  });
+});
+
+document.querySelectorAll("#convTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    convSort.dir = (convSort.key === key) ? -convSort.dir : -1;
+    convSort.key = key;
+    sortAndRenderConv();
+  });
+});
+
+document.querySelectorAll("#dispUpTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    dispUpSort.dir = (dispUpSort.key === key) ? -dispUpSort.dir : -1;
+    dispUpSort.key = key;
+    sortAndRenderDisp();
+  });
+});
+
+document.querySelectorAll("#dispDnTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    dispDnSort.dir = (dispDnSort.key === key) ? -dispDnSort.dir : -1;
+    dispDnSort.key = key;
+    sortAndRenderDisp();
+  });
+});
+
+document.querySelectorAll("#dispSectorTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    dispSectorSort.dir = (dispSectorSort.key === key) ? -dispSectorSort.dir : -1;
+    dispSectorSort.key = key;
+    sortAndRenderDisp();
+  });
+});
+
+document.querySelectorAll("#themeTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    themeSort.dir = (themeSort.key === key) ? -themeSort.dir : -1;
+    themeSort.key = key;
+    sortAndRenderTheme();
+  });
+});
+
+loadData();
+</script>
+</body>
+</html>
