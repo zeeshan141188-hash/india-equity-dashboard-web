@@ -202,6 +202,66 @@
     padding:0 2px;
   }
 
+  /* ---- RRG expandable rows ---- */
+  .rrg-row{cursor:pointer;}
+  .rrg-row .expand-icon{
+    display:inline-block;
+    width:14px;
+    color:var(--sub);
+    font-size:10px;
+    margin-right:6px;
+    transition:transform .15s ease;
+  }
+  .rrg-row.expanded .expand-icon{transform:rotate(90deg);}
+  .rrg-detail-row td{
+    padding:0;
+    background:#FBFBFA;
+  }
+  .rrg-detail-inner{padding:10px 14px 16px 34px;}
+  .rrg-stock-table{width:100%;border-collapse:collapse;background:transparent;box-shadow:none;border-radius:0;}
+  .rrg-stock-table thead th{
+    font-size:10px;
+    padding:6px 10px;
+    cursor:default;
+    background:transparent;
+    border-bottom:1px solid var(--line);
+  }
+  .rrg-stock-table tbody td{
+    padding:7px 10px;
+    font-size:12.5px;
+    border-bottom:1px solid #EEEFEC;
+  }
+  .rrg-stock-table tbody tr:last-child td{border-bottom:none;}
+  .rrg-stock-table tbody tr:hover{background:#F2F3F0;}
+  .rrg-empty-detail{padding:10px 14px 16px 34px;font-size:12.5px;color:var(--sub);}
+
+  .card-toggle-btn{
+    margin-top:10px;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:11.5px;
+    font-weight:600;
+    color:var(--sub);
+    background:none;
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:5px 10px;
+    cursor:pointer;
+  }
+  .card-toggle-btn:active{background:#EFEFEC;}
+  .card-top-stocks{margin-top:10px;display:none;flex-direction:column;gap:6px;}
+  .card-top-stocks.open{display:flex;}
+  .card-stock-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:12px;
+    padding:6px 8px;
+    background:#FBFBFA;
+    border-radius:6px;
+  }
+  .card-stock-row .cs-ticker{font-weight:600;font-family:'Space Grotesk',sans-serif;}
+  .card-stock-row .cs-meta{color:var(--sub);font-family:'IBM Plex Mono',monospace;font-size:11px;}
+
   .cards{display:none;flex-direction:column;gap:10px;}
   .card{
     background:var(--card);
@@ -380,7 +440,7 @@
     </div>
     <p class="chart-caption" id="rrgChartCaption"></p>
 
-    <div class="disp-subhead">Sub-Sector Relative Rotation — vs Top-500 Benchmark · Top 5 Highlighted</div>
+    <div class="disp-subhead">Sub-Sector Relative Rotation — vs Top-500 Benchmark · Top 5 Highlighted · Click a row for top stocks</div>
     <table id="rrgTable">
       <thead>
         <tr>
@@ -419,9 +479,19 @@ let themeSort = { key: "Conviction", dir: -1 };
 let rrgSort = { key: "Combined_Score", dir: -1 };
 let rrgChartInstance = null;
 
+// Which sub-sectors currently have their top-stocks drill-down open.
+// Kept as state OUTSIDE the render function so it survives sort re-renders
+// (every sort click rebuilds the table's innerHTML from scratch — without
+// this, expanding a row and then sorting a column would silently collapse it).
+let rrgExpanded = new Set();
+
 function fmt(n, d=2){
   if(n === null || n === undefined || isNaN(n)) return "—";
   return Number(n).toFixed(d);
+}
+
+function cleanTicker(t){
+  return (t || "").replace(".NS","").replace(".BO","");
 }
 
 async function loadData(){
@@ -495,7 +565,7 @@ function sortAndRenderFocus(){
 
   body.innerHTML = rows.map(r => `
     <tr>
-      <td class="ticker">${r.Ticker.replace(".NS","")}<span class="name-sub">${r.Name || ""}</span></td>
+      <td class="ticker">${cleanTicker(r.Ticker)}<span class="name-sub">${r.Name || ""}</span></td>
       <td>${r.Sector}<span class="name-sub">${r.Sub_Sector || ""}</span></td>
       <td><span class="tag ${r.Type}">${r.Type}</span></td>
       <td class="num">₹${fmt(r.Price)}</td>
@@ -512,7 +582,7 @@ function sortAndRenderFocus(){
     <div class="card">
       <div class="card-top">
         <div>
-          <div class="card-ticker">${r.Ticker.replace(".NS","")}</div>
+          <div class="card-ticker">${cleanTicker(r.Ticker)}</div>
           <div class="card-name">${r.Name || ""} · <span class="tag ${r.Type}">${r.Type}</span></div>
         </div>
         <div>
@@ -550,7 +620,7 @@ function sortAndRenderConv(){
       <td class="num">${fmt(r.breadth_pct,1)}%</td>
       <td class="num">${fmt(r.avg_basedays,0)}</td>
       <td class="num score-cell">${fmt(r.conviction,1)}</td>
-      <td>${(r.top_stock||"").replace(".NS","")}</td>
+      <td>${cleanTicker(r.top_stock)}</td>
     </tr>
   `).join("");
 
@@ -559,7 +629,7 @@ function sortAndRenderConv(){
       <div class="card-top">
         <div>
           <div class="card-ticker">${r.Sub_Sector}</div>
-          <div class="card-name">${r.sector} · top: ${(r.top_stock||"").replace(".NS","")}</div>
+          <div class="card-name">${r.sector} · top: ${cleanTicker(r.top_stock)}</div>
         </div>
         <div>
           <div class="card-score">${fmt(r.conviction,1)}</div>
@@ -594,7 +664,7 @@ function renderDispTable(rows, bodyId, cardsId, kind){
         <td class="num">${fmt(r.Bear_Exp_Pct,1)}%</td>
         <td class="num">${fmt(r.Density_Z,2)}</td>
         <td class="num score-cell">${fmt(r.Conviction,1)}</td>
-        <td>${(r.Top_Horse||"").replace(".NS","").replace(".BO","")}</td>
+        <td>${cleanTicker(r.Top_Horse)}</td>
       </tr>
     `).join("");
     cards.innerHTML = rows.map(r => `
@@ -602,7 +672,7 @@ function renderDispTable(rows, bodyId, cardsId, kind){
         <div class="card-top">
           <div>
             <div class="card-ticker">${r.Sector}</div>
-            <div class="card-name">top: ${(r.Top_Horse||"").replace(".NS","").replace(".BO","")}</div>
+            <div class="card-name">top: ${cleanTicker(r.Top_Horse)}</div>
           </div>
           <div>
             <div class="card-score">${fmt(r.Conviction,1)}</div>
@@ -621,7 +691,7 @@ function renderDispTable(rows, bodyId, cardsId, kind){
 
   body.innerHTML = rows.map(r => `
     <tr>
-      <td class="ticker">${r.Ticker.replace(".NS","").replace(".BO","")}</td>
+      <td class="ticker">${cleanTicker(r.Ticker)}</td>
       <td>${r.Sector}<span class="name-sub">${r.Sub_Sector || ""}</span></td>
       <td class="num">₹${fmt(r.Price)}</td>
       <td class="num">${fmt(r.Displacement_Z,2)}</td>
@@ -636,7 +706,7 @@ function renderDispTable(rows, bodyId, cardsId, kind){
     <div class="card">
       <div class="card-top">
         <div>
-          <div class="card-ticker">${r.Ticker.replace(".NS","").replace(".BO","")}</div>
+          <div class="card-ticker">${cleanTicker(r.Ticker)}</div>
           <div class="card-name">${r.Sector}${r.Structural_Level !== "None" ? " · " + r.Structural_Level : ""}</div>
         </div>
         <div>
@@ -681,7 +751,7 @@ function sortAndRenderTheme(){
       <td class="num">${fmt(r.DQ,1)}</td>
       <td class="num score-cell">${fmt(r.Conviction,1)}</td>
       <td><span class="tag ${r.Driver}">${r.Driver}</span></td>
-      <td>${(r.Lead_Stock||"").replace(".NS","").replace(".BO","")}</td>
+      <td>${cleanTicker(r.Lead_Stock)}</td>
     </tr>
   `).join("");
 
@@ -690,7 +760,7 @@ function sortAndRenderTheme(){
       <div class="card-top">
         <div>
           <div class="card-ticker">${r.Sub_Sector}</div>
-          <div class="card-name">${r.Stocks} stocks · <span class="tag ${r.Driver}">${r.Driver}</span> driven · lead: ${(r.Lead_Stock||"").replace(".NS","").replace(".BO","")}</div>
+          <div class="card-name">${r.Stocks} stocks · <span class="tag ${r.Driver}">${r.Driver}</span> driven · lead: ${cleanTicker(r.Lead_Stock)}</div>
         </div>
         <div>
           <div class="card-score">${fmt(r.Conviction,1)}</div>
@@ -724,6 +794,45 @@ function highBadges(r){
   </div>`;
 }
 
+// Builds the nested "top stocks in this sub-sector" table shown when a
+// row is expanded. Uses the SAME field names sector_rrg.py's Top_Stocks
+// already carries (Ticker, Price, rs_ratio, mom_4w_pct, the three high
+// flags, stock_score) — no re-derivation, so this can never disagree
+// with what the backend computed.
+function renderRRGStockDetail(subSectorRow){
+  const stocks = subSectorRow.Top_Stocks || [];
+  if(!stocks.length){
+    return `<div class="rrg-empty-detail">No individual stock data available for this sub-sector.</div>`;
+  }
+  const rowsHtml = stocks.map(s => `
+    <tr>
+      <td class="ticker">${cleanTicker(s.Ticker)}</td>
+      <td class="num">₹${fmt(s.Price)}</td>
+      <td class="num">${fmt(s.rs_ratio,3)}</td>
+      <td class="num">${s.mom_4w_pct >= 0 ? '+' : ''}${fmt(s.mom_4w_pct,2)}%</td>
+      <td>${highBadges(s)}</td>
+      <td class="num score-cell">${fmt(s.stock_score,1)}</td>
+    </tr>
+  `).join("");
+  return `
+    <div class="rrg-detail-inner">
+      <table class="rrg-stock-table">
+        <thead>
+          <tr>
+            <th>Ticker</th>
+            <th class="num">Price</th>
+            <th class="num">RS Ratio</th>
+            <th class="num">4w Mom %</th>
+            <th>Structural High</th>
+            <th class="num">Score</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+  `;
+}
+
 function sortAndRenderRRG(){
   rrgData.forEach(r => {
     r.struct_rank_display = r.is_52w_high ? 3 : r.is_26w_high ? 2 : r.is_13w_high ? 1 : 0;
@@ -740,38 +849,83 @@ function sortAndRenderRRG(){
     return;
   }
 
-  body.innerHTML = rows.map(r => `
-    <tr class="${r.Top5 ? 'top5-row' : ''}">
-      <td class="ticker">${r.Sub_Sector}${r.Top5 ? ' <span class="tag Top5Badge">TOP 5</span>' : ''}</td>
-      <td>${r.Sector}</td>
-      <td class="num">${r.Constituents}</td>
-      <td class="num">${fmt(r.rs_ratio,3)}</td>
-      <td class="num">${r.mom_4w_pct >= 0 ? '+' : ''}${fmt(r.mom_4w_pct,2)}%</td>
-      <td>${highBadges(r)}</td>
-      <td class="num score-cell">${fmt(r.Combined_Score,1)}</td>
-    </tr>
-  `).join("");
+  body.innerHTML = rows.map(r => {
+    const isOpen = rrgExpanded.has(r.Sub_Sector);
+    const mainRow = `
+      <tr class="rrg-row ${r.Top5 ? 'top5-row' : ''} ${isOpen ? 'expanded' : ''}" data-subsector="${r.Sub_Sector}">
+        <td class="ticker"><span class="expand-icon">▶</span>${r.Sub_Sector}${r.Top5 ? ' <span class="tag Top5Badge">TOP 5</span>' : ''}</td>
+        <td>${r.Sector}</td>
+        <td class="num">${r.Constituents}</td>
+        <td class="num">${fmt(r.rs_ratio,3)}</td>
+        <td class="num">${r.mom_4w_pct >= 0 ? '+' : ''}${fmt(r.mom_4w_pct,2)}%</td>
+        <td>${highBadges(r)}</td>
+        <td class="num score-cell">${fmt(r.Combined_Score,1)}</td>
+      </tr>
+    `;
+    const detailRow = isOpen ? `
+      <tr class="rrg-detail-row">
+        <td colspan="7">${renderRRGStockDetail(r)}</td>
+      </tr>
+    ` : "";
+    return mainRow + detailRow;
+  }).join("");
 
-  cards.innerHTML = rows.map(r => `
-    <div class="card ${r.Top5 ? 'top5-card' : ''}">
-      <div class="card-top">
-        <div>
-          <div class="card-ticker">${r.Sub_Sector}${r.Top5 ? ' <span class="tag Top5Badge">TOP 5</span>' : ''}</div>
-          <div class="card-name">${r.Sector} · ${r.Constituents} stocks</div>
-        </div>
-        <div>
-          <div class="card-score">${fmt(r.Combined_Score,1)}</div>
-          <div class="card-score-label">Score</div>
-        </div>
+  cards.innerHTML = rows.map(r => {
+    const stocks = r.Top_Stocks || [];
+    const stocksHtml = stocks.map(s => `
+      <div class="card-stock-row">
+        <span class="cs-ticker">${cleanTicker(s.Ticker)}</span>
+        <span class="cs-meta">₹${fmt(s.Price)} · ${s.mom_4w_pct >= 0 ? '+' : ''}${fmt(s.mom_4w_pct,1)}% · ${fmt(s.stock_score,0)}</span>
       </div>
-      ${highBadges(r)}
-      <div class="card-meta" style="margin-top:8px;">
-        <span>RS Ratio <b>${fmt(r.rs_ratio,3)}</b></span>
-        <span>4w Mom <b>${r.mom_4w_pct >= 0 ? '+' : ''}${fmt(r.mom_4w_pct,2)}%</b></span>
+    `).join("");
+    return `
+      <div class="card ${r.Top5 ? 'top5-card' : ''}">
+        <div class="card-top">
+          <div>
+            <div class="card-ticker">${r.Sub_Sector}${r.Top5 ? ' <span class="tag Top5Badge">TOP 5</span>' : ''}</div>
+            <div class="card-name">${r.Sector} · ${r.Constituents} stocks</div>
+          </div>
+          <div>
+            <div class="card-score">${fmt(r.Combined_Score,1)}</div>
+            <div class="card-score-label">Score</div>
+          </div>
+        </div>
+        ${highBadges(r)}
+        <div class="card-meta" style="margin-top:8px;">
+          <span>RS Ratio <b>${fmt(r.rs_ratio,3)}</b></span>
+          <span>4w Mom <b>${r.mom_4w_pct >= 0 ? '+' : ''}${fmt(r.mom_4w_pct,2)}%</b></span>
+        </div>
+        <button class="card-toggle-btn" data-subsector-toggle="${r.Sub_Sector}">Show top stocks</button>
+        <div class="card-top-stocks" data-subsector-list="${r.Sub_Sector}">${stocksHtml}</div>
       </div>
-    </div>
-  `).join("");
+    `;
+  }).join("");
 }
+
+// Event delegation: ONE listener on the table body, not one per row.
+// Rows are torn down and rebuilt on every sort/expand, so listeners
+// attached directly to <tr> elements would need re-attaching every
+// single render — delegation on the stable parent avoids that entirely.
+document.getElementById("rrgBody").addEventListener("click", (e)=>{
+  const row = e.target.closest(".rrg-row");
+  if(!row) return;
+  const key = row.dataset.subsector;
+  if(rrgExpanded.has(key)) rrgExpanded.delete(key);
+  else rrgExpanded.add(key);
+  sortAndRenderRRG();
+});
+
+// Same delegation pattern for the mobile card view's toggle buttons.
+document.getElementById("rrgCards").addEventListener("click", (e)=>{
+  const btn = e.target.closest("[data-subsector-toggle]");
+  if(!btn) return;
+  const key = btn.dataset.subsectorToggle;
+  const list = document.querySelector(`[data-subsector-list="${CSS.escape(key)}"]`);
+  if(!list) return;
+  const willOpen = !list.classList.contains("open");
+  list.classList.toggle("open", willOpen);
+  btn.textContent = willOpen ? "Hide top stocks" : "Show top stocks";
+});
 
 function renderRRGChart(chartSeries, rebaseDate, asOfWeek){
   const caption = document.getElementById("rrgChartCaption");
@@ -801,8 +955,6 @@ function renderRRGChart(chartSeries, rebaseDate, asOfWeek){
     };
   });
 
-  // Equal-performance reference line (ratio = 1.0) — drawn as a dashed flat dataset
-  // rather than a Chart.js annotation plugin, to avoid a second dependency.
   datasets.push({
     label: "Equal performance (1.0)",
     data: labels.map(() => 1.0),
@@ -900,7 +1052,8 @@ document.querySelectorAll("#themeTable thead th").forEach(th=>{
 });
 
 document.querySelectorAll("#rrgTable thead th").forEach(th=>{
-  th.addEventListener("click", ()=>{
+  th.addEventListener("click", (e)=>{
+    e.stopPropagation();
     const key = th.dataset.key;
     rrgSort.dir = (rrgSort.key === key) ? -rrgSort.dir : -1;
     rrgSort.key = key;
