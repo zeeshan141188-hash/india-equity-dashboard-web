@@ -186,6 +186,22 @@
   .high-badge.active{background:var(--teal-bg);color:var(--teal);}
   .high-badge.active-52{background:var(--gold-bg);color:var(--gold);}
 
+  .chart-wrap{
+    position:relative;
+    height:320px;
+    margin-bottom:20px;
+    background:var(--card);
+    border-radius:var(--radius);
+    padding:16px 14px 10px;
+    box-shadow:0 1px 2px rgba(20,23,26,0.04);
+  }
+  .chart-caption{
+    font-size:12px;
+    color:var(--sub);
+    margin:0 0 20px;
+    padding:0 2px;
+  }
+
   .cards{display:none;flex-direction:column;gap:10px;}
   .card{
     background:var(--card);
@@ -206,6 +222,7 @@
     table{display:none;}
     .cards{display:flex;}
     h1{font-size:22px;}
+    .chart-wrap{height:280px;}
   }
 
   .empty-state{
@@ -358,7 +375,12 @@
   </div>
 
   <div class="panel" id="panel-rrg">
-    <div class="disp-subhead">Sub-Sector Relative Rotation — vs 800cr+ Universe · Top 5 Highlighted</div>
+    <div class="chart-wrap">
+      <canvas id="rrgChart"></canvas>
+    </div>
+    <p class="chart-caption" id="rrgChartCaption"></p>
+
+    <div class="disp-subhead">Sub-Sector Relative Rotation — vs Top-500 Benchmark · Top 5 Highlighted</div>
     <table id="rrgTable">
       <thead>
         <tr>
@@ -377,6 +399,7 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <script>
 const DATA_URL = "https://raw.githubusercontent.com/zeeshan141188-hash/india-equity-dashboard-output/main/latest.json";
 
@@ -394,6 +417,7 @@ let dispDnSort = { key: "Score", dir: -1 };
 let dispSectorSort = { key: "Conviction", dir: -1 };
 let themeSort = { key: "Conviction", dir: -1 };
 let rrgSort = { key: "Combined_Score", dir: -1 };
+let rrgChartInstance = null;
 
 function fmt(n, d=2){
   if(n === null || n === undefined || isNaN(n)) return "—";
@@ -421,6 +445,7 @@ async function loadData(){
     sortAndRenderDisp();
     sortAndRenderTheme();
     sortAndRenderRRG();
+    renderRRGChart(rrg.chart_series || [], rrg.rebase_date, rrg.as_of_week);
   }catch(err){
     document.getElementById("statusDot").className = "dot err";
     document.getElementById("statusText").textContent = "Could not load data — " + err.message;
@@ -689,8 +714,6 @@ function sortAndRenderTheme(){
 }
 
 function highBadges(r){
-  // Only show the HIGHEST tier reached, since is_26w_high implies clearing 13w too
-  // in practice for most rows, but we display all three for full transparency.
   const b13 = r.is_13w_high ? "active" : "";
   const b26 = r.is_26w_high ? "active" : "";
   const b52 = r.is_52w_high ? "active-52" : "";
@@ -702,7 +725,6 @@ function highBadges(r){
 }
 
 function sortAndRenderRRG(){
-  // struct_rank_display is a synthetic sort key: 52w > 26w > 13w > none
   rrgData.forEach(r => {
     r.struct_rank_display = r.is_52w_high ? 3 : r.is_26w_high ? 2 : r.is_13w_high ? 1 : 0;
   });
@@ -749,6 +771,69 @@ function sortAndRenderRRG(){
       </div>
     </div>
   `).join("");
+}
+
+function renderRRGChart(chartSeries, rebaseDate, asOfWeek){
+  const caption = document.getElementById("rrgChartCaption");
+  if(!chartSeries || !chartSeries.length || typeof Chart === "undefined"){
+    caption.textContent = "";
+    return;
+  }
+
+  const dateSet = new Set();
+  chartSeries.forEach(s => s.series.forEach(p => dateSet.add(p.date)));
+  const labels = Array.from(dateSet).sort();
+
+  const palette = ["#C1592B", "#2B6E63", "#5B4B8A", "#A8842B", "#2E5A9C"];
+
+  const datasets = chartSeries.map((s, i) => {
+    const map = {};
+    s.series.forEach(p => map[p.date] = p.ratio);
+    return {
+      label: s.Sub_Sector,
+      data: labels.map(d => (d in map) ? map[d] : null),
+      borderColor: palette[i % palette.length],
+      backgroundColor: palette[i % palette.length],
+      borderWidth: 2,
+      pointRadius: 0,
+      tension: 0.15,
+      spanGaps: true,
+    };
+  });
+
+  // Equal-performance reference line (ratio = 1.0) — drawn as a dashed flat dataset
+  // rather than a Chart.js annotation plugin, to avoid a second dependency.
+  datasets.push({
+    label: "Equal performance (1.0)",
+    data: labels.map(() => 1.0),
+    borderColor: "#9AA0A6",
+    borderDash: [4, 4],
+    borderWidth: 1,
+    pointRadius: 0,
+    fill: false,
+  });
+
+  if(rrgChartInstance) rrgChartInstance.destroy();
+  rrgChartInstance = new Chart(document.getElementById("rrgChart").getContext("2d"), {
+    type: "line",
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(3) : "—"}` } }
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 8, font: { size: 10 } } },
+        y: { title: { display: true, text: "RS Ratio (basket ÷ top-500 benchmark)", font: { size: 11 } } }
+      }
+    }
+  });
+
+  const rebaseDisplay = rebaseDate ? new Date(rebaseDate).toLocaleDateString("en-GB", {day: "2-digit", month: "short", year: "numeric"}) : "—";
+  caption.textContent = `Rebased to 1.0 on ${rebaseDisplay}. Line above 1.0 = outperforming the top-500 benchmark; below = underperforming. As of week ending ${asOfWeek || "—"}.`;
 }
 
 document.querySelectorAll(".tab-btn").forEach(btn=>{
