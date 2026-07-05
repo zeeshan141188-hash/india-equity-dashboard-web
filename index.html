@@ -459,7 +459,7 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 const DATA_URL = "https://raw.githubusercontent.com/zeeshan141188-hash/india-equity-dashboard-output/main/latest.json";
 
@@ -794,11 +794,6 @@ function highBadges(r){
   </div>`;
 }
 
-// Builds the nested "top stocks in this sub-sector" table shown when a
-// row is expanded. Uses the SAME field names sector_rrg.py's Top_Stocks
-// already carries (Ticker, Price, rs_ratio, mom_4w_pct, the three high
-// flags, stock_score) — no re-derivation, so this can never disagree
-// with what the backend computed.
 function renderRRGStockDetail(subSectorRow){
   const stocks = subSectorRow.Top_Stocks || [];
   if(!stocks.length){
@@ -902,10 +897,6 @@ function sortAndRenderRRG(){
   }).join("");
 }
 
-// Event delegation: ONE listener on the table body, not one per row.
-// Rows are torn down and rebuilt on every sort/expand, so listeners
-// attached directly to <tr> elements would need re-attaching every
-// single render — delegation on the stable parent avoids that entirely.
 document.getElementById("rrgBody").addEventListener("click", (e)=>{
   const row = e.target.closest(".rrg-row");
   if(!row) return;
@@ -915,7 +906,6 @@ document.getElementById("rrgBody").addEventListener("click", (e)=>{
   sortAndRenderRRG();
 });
 
-// Same delegation pattern for the mobile card view's toggle buttons.
 document.getElementById("rrgCards").addEventListener("click", (e)=>{
   const btn = e.target.closest("[data-subsector-toggle]");
   if(!btn) return;
@@ -929,7 +919,15 @@ document.getElementById("rrgCards").addEventListener("click", (e)=>{
 
 function renderRRGChart(chartSeries, rebaseDate, asOfWeek){
   const caption = document.getElementById("rrgChartCaption");
-  if(!chartSeries || !chartSeries.length || typeof Chart === "undefined"){
+  const wrap = document.querySelector("#panel-rrg .chart-wrap");
+
+  if(typeof Chart === "undefined"){
+    wrap.innerHTML = '<div class="empty-state">Chart library failed to load. The table below is unaffected — try a hard refresh.</div>';
+    caption.textContent = "";
+    return;
+  }
+  if(!chartSeries || !chartSeries.length){
+    wrap.innerHTML = '<div class="empty-state">No chart data in today\'s run.</div>';
     caption.textContent = "";
     return;
   }
