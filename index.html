@@ -69,6 +69,22 @@
   }
   .subtitle{color:var(--sub);font-size:14px;margin:0;}
 
+  #update-btn{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    padding:8px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--card);
+    color:var(--ink);
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  #update-btn:hover:not(:disabled){border-color:var(--teal);background:var(--teal-bg);}
+  #update-btn:disabled{cursor:default;opacity:0.6;}
+  #update-status{font-size:12.5px;color:var(--sub);}
+
   .warnings-box{
     margin:0 16px 16px;
     padding:12px 14px;
@@ -363,13 +379,11 @@
   <h1>PM Focus Screen</h1>
   <p class="subtitle">India equities — constructive accumulation ranking</p>
   <div id="update-button-wrap" style="display:flex;align-items:center;gap:10px;margin-top:12px;">
-    <button id="update-btn" disabled style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13px;padding:8px 16px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;">Checking...</button>
-    <span id="update-status" style="font-size:12.5px;color:var(--sub);"></span>
+    <button id="update-btn" disabled>Checking...</button>
+    <span id="update-status"></span>
   </div>
 </header>
 
-<div id="warningsBox"></div>
-  
 <div id="warningsBox"></div>
 
 <div class="wrap">
