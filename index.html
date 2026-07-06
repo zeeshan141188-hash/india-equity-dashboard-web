@@ -1196,11 +1196,67 @@ document.querySelectorAll("#rrgTable thead th").forEach(th=>{
   const btn = document.getElementById("update-btn");
   const status = document.getElementById("update-status");
   const ENDPOINT = "/api/trigger-refresh";
+  const POLL_INTERVAL_MS = 20000;   // 20s between checks
+  const POLL_MAX_ATTEMPTS = 45;     // 45 * 20s = 15 min ceiling, comfortably above the slowest observed run (~9m30s) plus dispatch latency
+
+  let lastKnownRunStamp = null;   // run_date_display value seen before the current trigger
+  let pollTimer = null;
+  let pollAttempts = 0;
+  let remainingAfterTrigger = null;
+  let limitAfterTrigger = null;
 
   function render(remaining, limit, disabledReason){
     btn.textContent = "Update";
     btn.disabled = remaining <= 0 || !!disabledReason;
     status.textContent = disabledReason ? disabledReason : `${remaining}/${limit} refreshes left today`;
+  }
+
+  async function fetchCurrentRunStamp(){
+    // Independent of loadData() so a failure here never blocks the main dashboard fetch.
+    const res = await fetch(DATA_URL, { cache: "no-store" });
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const json = await res.json();
+    return json.run_date_display || json.run_date || null;
+  }
+
+  function stopPolling(){
+    if(pollTimer){
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+    pollAttempts = 0;
+  }
+
+  function pollForCompletion(){
+    stopPolling(); // cancel any previous poll loop before starting a new one
+
+    const tick = async () => {
+      pollAttempts++;
+      try{
+        const currentStamp = await fetchCurrentRunStamp();
+        if(currentStamp && currentStamp !== lastKnownRunStamp){
+          // New data has landed — refresh every panel using the existing loader.
+          status.textContent = `Done — data updated (${currentStamp}). Refreshing view...`;
+          await loadData();
+          status.textContent = `Done — data updated (${currentStamp}). ${remainingAfterTrigger}/${limitAfterTrigger} left today.`;
+          btn.disabled = remainingAfterTrigger <= 0;
+          return; // stop polling, we're done
+        }
+      }catch(e){
+        // A single failed poll (transient network blip) shouldn't kill the whole wait —
+        // just skip this tick and try again on the next one.
+      }
+
+      if(pollAttempts >= POLL_MAX_ATTEMPTS){
+        status.textContent = `Still running after 15 min — check back shortly. ${remainingAfterTrigger}/${limitAfterTrigger} left today.`;
+        btn.disabled = remainingAfterTrigger <= 0;
+        return;
+      }
+
+      pollTimer = setTimeout(tick, POLL_INTERVAL_MS);
+    };
+
+    pollTimer = setTimeout(tick, POLL_INTERVAL_MS);
   }
 
   async function checkStatus(){
@@ -1219,6 +1275,15 @@ document.querySelectorAll("#rrgTable thead th").forEach(th=>{
     btn.disabled = true;
     btn.textContent = "Triggering...";
     status.textContent = "";
+
+    // Capture the baseline BEFORE dispatching, so we have something correct
+    // to compare against even if the run finishes unusually fast.
+    try{
+      lastKnownRunStamp = await fetchCurrentRunStamp();
+    }catch(e){
+      lastKnownRunStamp = null; // fall back gracefully; worst case we just wait for any non-null stamp
+    }
+
     try{
       const res = await fetch(ENDPOINT, { method: "POST" });
       const data = await res.json();
@@ -1227,9 +1292,14 @@ document.querySelectorAll("#rrgTable thead th").forEach(th=>{
         return;
       }
       if(!res.ok) throw new Error(data.error || "Unknown error");
-      status.textContent = `Triggered. ${data.remaining}/${data.limit} left today. Refresh in ~5 min.`;
+
+      remainingAfterTrigger = data.remaining;
+      limitAfterTrigger = data.limit;
       btn.textContent = "Update";
-      btn.disabled = data.remaining <= 0;
+      btn.disabled = true; // stays disabled while we wait, even if refreshes remain — avoids double-triggers mid-poll
+      status.textContent = `Triggered. Waiting for it to finish (usually 7-9 min)...`;
+
+      pollForCompletion();
     }catch(e){
       btn.textContent = "Update";
       btn.disabled = false;
