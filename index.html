@@ -278,6 +278,60 @@
   .card-meta{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:12px;color:var(--sub);}
   .card-meta b{font-family:'IBM Plex Mono',monospace;color:var(--ink);font-weight:500;}
 
+  .ask-avatar-row{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    margin-bottom:20px;
+  }
+  .ask-avatar{
+    width:52px;
+    height:52px;
+    border-radius:50%;
+    background:var(--violet-bg);
+    color:var(--violet);
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:18px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-shrink:0;
+  }
+  .ask-name{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;}
+  .ask-opening{color:var(--sub);font-size:13px;margin-top:2px;}
+  .ask-buttons{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;}
+  .ask-btn{
+    text-align:left;
+    font-family:'Inter',sans-serif;
+    font-size:13.5px;
+    font-weight:500;
+    color:var(--ink);
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:11px 14px;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .ask-btn:hover{border-color:var(--violet);background:var(--violet-bg);}
+  .ask-btn.active{border-color:var(--violet);background:var(--violet-bg);color:var(--violet);font-weight:600;}
+  .ask-answer-box{
+    background:var(--card);
+    border-radius:var(--radius);
+    padding:16px;
+    font-size:13.5px;
+    line-height:1.6;
+    white-space:pre-line;
+    box-shadow:0 1px 2px rgba(20,23,26,0.04);
+  }
+  .ask-answer-meta{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--sub);
+    margin-top:14px;
+  }
+
   @media (max-width:680px){
     table{display:none;}
     .cards{display:flex;}
@@ -319,6 +373,7 @@
     <button class="tab-btn" data-tab="displacement">Displacement Scanner</button>
     <button class="tab-btn" data-tab="theme">Theme Conviction</button>
     <button class="tab-btn" data-tab="rrg">Sector Rotation</button>
+    <button class="tab-btn" data-tab="ask">Ask</button>
   </div>
 
   <div class="panel active" id="panel-focus">
@@ -457,12 +512,26 @@
     </table>
     <div class="cards" id="rrgCards"></div>
   </div>
+
+  <div class="panel" id="panel-ask">
+    <div class="ask-avatar-row">
+      <div class="ask-avatar">PM</div>
+      <div>
+        <div class="ask-name">PM Focus Assistant</div>
+        <div class="ask-opening">Tap a question below for today's answer, straight from the screen data.</div>
+      </div>
+    </div>
+    <div class="ask-buttons" id="askButtons"></div>
+    <div class="ask-answer-box" id="askAnswerBox" style="display:none;"></div>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 const DATA_URL = "https://raw.githubusercontent.com/zeeshan141188-hash/india-equity-dashboard-output/main/latest.json";
+const QA_URL = DATA_URL.replace("latest.json", "qa.json");
 
+let qaData = [];
 let focusData = [];
 let convData = [];
 let dispUpData = [];
@@ -537,6 +606,41 @@ function renderStatus(json){
     wbox.innerHTML = `<div class="warnings-box wrap"><strong>Flagged by pipeline</strong>${json.warnings.join("<br>")}</div>`;
   } else {
     wbox.innerHTML = "";
+  }
+}
+
+function renderAskButtons(){
+  const container = document.getElementById("askButtons");
+  if(!qaData.length){
+    container.innerHTML = '<div class="empty-state">Q&amp;A data not available right now.</div>';
+    return;
+  }
+  container.innerHTML = qaData.map((qa, i) => `
+    <button class="ask-btn" data-qa-index="${i}">${qa.question}</button>
+  `).join("");
+}
+
+document.getElementById("askButtons").addEventListener("click", (e)=>{
+  const btn = e.target.closest(".ask-btn");
+  if(!btn) return;
+  document.querySelectorAll(".ask-btn").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  const qa = qaData[Number(btn.dataset.qaIndex)];
+  const box = document.getElementById("askAnswerBox");
+  box.style.display = "block";
+  box.textContent = qa.answer;
+});
+
+async function loadQA(){
+  try{
+    const res = await fetch(QA_URL, {cache: "no-store"});
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const json = await res.json();
+    qaData = json.qa || [];
+    renderAskButtons();
+  }catch(err){
+    document.getElementById("askButtons").innerHTML =
+      `<div class="empty-state">Could not load Q&amp;A data — ${err.message}</div>`;
   }
 }
 
@@ -1060,6 +1164,7 @@ document.querySelectorAll("#rrgTable thead th").forEach(th=>{
 });
 
 loadData();
+loadQA();
 </script>
 </body>
 </html>
