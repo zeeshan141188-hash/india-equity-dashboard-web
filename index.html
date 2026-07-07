@@ -124,6 +124,39 @@
   .panel{display:none;padding:0 16px;}
   .panel.active{display:block;}
 
+  /* ---- Sector filter bar (Focus Screen) ---- */
+  .sector-filter-bar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:12px;
+    flex-wrap:wrap;
+  }
+  .sector-filter-bar label{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:12.5px;
+    color:var(--sub);
+    text-transform:uppercase;
+    letter-spacing:0.03em;
+  }
+  #focusSectorFilter{
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--card);
+    color:var(--ink);
+    cursor:pointer;
+    max-width:100%;
+  }
+  #focusSectorFilter:hover{border-color:var(--teal);}
+  .sector-filter-caption{
+    font-size:12.5px;
+    color:var(--sub);
+  }
+
   table{width:100%;border-collapse:collapse;background:var(--card);border-radius:var(--radius);overflow:hidden;box-shadow:0 1px 2px rgba(20,23,26,0.04);}
   thead th{
     text-align:left;
@@ -397,6 +430,13 @@
   </div>
 
   <div class="panel active" id="panel-focus">
+    <div class="sector-filter-bar">
+      <label for="focusSectorFilter">Sector</label>
+      <select id="focusSectorFilter">
+        <option value="__all__">All Sectors</option>
+      </select>
+      <span class="sector-filter-caption" id="focusSectorCaption"></span>
+    </div>
     <table id="focusTable">
       <thead>
         <tr>
@@ -423,8 +463,10 @@
         <tr>
           <th data-key="Sub_Sector">Sub-Sector</th>
           <th data-key="sector">Sector</th>
+          <th data-key="n_accumulating" class="num">N Acc / Total</th>
           <th data-key="breadth_pct" class="num">Breadth %</th>
           <th data-key="avg_basedays" class="num">Avg Base Days</th>
+          <th data-key="avg_followthru" class="num">Avg Follow-Thru</th>
           <th data-key="conviction" class="num">Conviction</th>
           <th data-key="top_stock">Top Stock</th>
         </tr>
@@ -435,6 +477,13 @@
   </div>
 
   <div class="panel" id="panel-displacement">
+    <div class="sector-filter-bar">
+      <label for="dispSectorFilter">Sector</label>
+      <select id="dispSectorFilter">
+        <option value="__all__">All Sectors</option>
+      </select>
+      <span class="sector-filter-caption" id="dispSectorCaption"></span>
+    </div>
     <div class="disp-subhead">Structural Breaks — Up</div>
     <table id="dispUpTable">
       <thead>
@@ -490,6 +539,13 @@
   </div>
 
   <div class="panel" id="panel-theme">
+    <div class="sector-filter-bar">
+      <label for="themeSectorFilter">Sector</label>
+      <select id="themeSectorFilter">
+        <option value="__all__">All Sectors</option>
+      </select>
+      <span class="sector-filter-caption" id="themeSectorCaption"></span>
+    </div>
     <table id="themeTable">
       <thead>
         <tr>
@@ -560,6 +616,12 @@
 const DATA_URL = "https://raw.githubusercontent.com/zeeshan141188-hash/india-equity-dashboard-output/main/latest.json";
 const QA_URL = DATA_URL.replace("latest.json", "qa.json");
 
+// How many rows to show when a specific sector is selected in the Focus
+// Screen filter -- mirrors BQNT's "Top 10: {Sector}" drill-down, kept at 5
+// here since the website's per-sector counts are generally smaller than
+// BQNT's fuller universe.
+const SECTOR_DRILLDOWN_LIMIT = 5;
+
 let qaData = [];
 let focusData = [];
 let convData = [];
@@ -576,6 +638,20 @@ let dispSectorSort = { key: "Conviction", dir: -1 };
 let themeSort = { key: "Conviction", dir: -1 };
 let rrgSort = { key: "Combined_Score", dir: -1 };
 let rrgChartInstance = null;
+
+// Which sub-sector is currently selected in the Focus Screen sector filter.
+// "__all__" means no filter -- show every idea, unlimited, as before.
+// Kept as state OUTSIDE the render function so it survives re-renders
+// triggered by column-header sort clicks.
+let focusSectorFilter = "__all__";
+
+// Same pattern, applied to Theme Conviction (filters sub-sector themes by
+// their Sector field) and to the Displacement Scanner's Up/Down tables (one
+// shared filter drives both, since they're two views of the same underlying
+// weekly stock universe -- the Sector Conviction table is already sector-
+// level and is deliberately left unfiltered).
+let themeSectorFilter = "__all__";
+let dispSectorFilter = "__all__";
 
 // Which sub-sectors currently have their top-stocks drill-down open.
 // Kept as state OUTSIDE the render function so it survives sort re-renders
@@ -608,6 +684,9 @@ async function loadData(){
     themeData = theme.themes || [];
     const rrg = json.sector_rrg || {};
     rrgData = rrg.sub_sectors || [];
+    populateFocusSectorFilter();
+    populateDispSectorFilter();
+    populateThemeSectorFilter();
     sortAndRenderFocus();
     sortAndRenderConv();
     sortAndRenderDisp();
@@ -685,14 +764,97 @@ function sortRows(rows, sortState){
   });
 }
 
+// ---- Sector drill-down (Focus Screen) ----
+// Populates the <select> with every sector present in today's ideas, each
+// annotated with its count, e.g. "Healthcare & Pharma (5)". Re-run on every
+// data load since the sector list changes day to day.
+function populateFocusSectorFilter(){
+  const sel = document.getElementById("focusSectorFilter");
+  const counts = {};
+  focusData.forEach(r => { counts[r.Sector] = (counts[r.Sector] || 0) + 1; });
+  const sectors = Object.keys(counts).sort();
+
+  // If the previously-selected sector no longer appears in today's data
+  // (e.g. it had zero qualifying ideas today), fall back to "All Sectors"
+  // rather than silently showing an empty table under a stale label.
+  if(focusSectorFilter !== "__all__" && !sectors.includes(focusSectorFilter)){
+    focusSectorFilter = "__all__";
+  }
+
+  sel.innerHTML = `<option value="__all__">All Sectors (${focusData.length})</option>`
+    + sectors.map(s => `<option value="${s}">${s} (${counts[s]})</option>`).join("");
+  sel.value = focusSectorFilter;
+}
+
+document.getElementById("focusSectorFilter").addEventListener("change", (e)=>{
+  focusSectorFilter = e.target.value;
+  sortAndRenderFocus();
+});
+
+// ---- Sector drill-down (Theme Conviction) ----
+function populateThemeSectorFilter(){
+  const sel = document.getElementById("themeSectorFilter");
+  const counts = {};
+  themeData.forEach(r => { counts[r.Sector] = (counts[r.Sector] || 0) + 1; });
+  const sectors = Object.keys(counts).sort();
+
+  if(themeSectorFilter !== "__all__" && !sectors.includes(themeSectorFilter)){
+    themeSectorFilter = "__all__";
+  }
+
+  sel.innerHTML = `<option value="__all__">All Sectors (${themeData.length})</option>`
+    + sectors.map(s => `<option value="${s}">${s} (${counts[s]})</option>`).join("");
+  sel.value = themeSectorFilter;
+}
+
+document.getElementById("themeSectorFilter").addEventListener("change", (e)=>{
+  themeSectorFilter = e.target.value;
+  sortAndRenderTheme();
+});
+
+// ---- Sector drill-down (Displacement Scanner: Up + Down tables) ----
+// Sector options are the union of whatever appears in either table, each
+// annotated with its combined count across both -- e.g. a sector with 3
+// up-displacements and 1 down-displacement shows as "(4)".
+function populateDispSectorFilter(){
+  const sel = document.getElementById("dispSectorFilter");
+  const counts = {};
+  [...dispUpData, ...dispDnData].forEach(r => { counts[r.Sector] = (counts[r.Sector] || 0) + 1; });
+  const sectors = Object.keys(counts).sort();
+
+  if(dispSectorFilter !== "__all__" && !sectors.includes(dispSectorFilter)){
+    dispSectorFilter = "__all__";
+  }
+
+  sel.innerHTML = `<option value="__all__">All Sectors (${dispUpData.length + dispDnData.length})</option>`
+    + sectors.map(s => `<option value="${s}">${s} (${counts[s]})</option>`).join("");
+  sel.value = dispSectorFilter;
+}
+
+document.getElementById("dispSectorFilter").addEventListener("change", (e)=>{
+  dispSectorFilter = e.target.value;
+  sortAndRenderDisp();
+});
+
 function sortAndRenderFocus(){
-  const rows = sortRows(focusData, focusSort);
+  const isSectorView = focusSectorFilter !== "__all__";
+  const scoped = isSectorView ? focusData.filter(r => r.Sector === focusSectorFilter) : focusData;
+  const sorted = sortRows(scoped, focusSort);
+  const rows = isSectorView ? sorted.slice(0, SECTOR_DRILLDOWN_LIMIT) : sorted;
+
+  const caption = document.getElementById("focusSectorCaption");
+  caption.textContent = isSectorView
+    ? `Showing top ${Math.min(SECTOR_DRILLDOWN_LIMIT, scoped.length)} of ${scoped.length}, sorted by ${focusSort.key}`
+    : "";
+
   const body = document.getElementById("focusBody");
   const cards = document.getElementById("focusCards");
 
   if(!rows.length){
     body.innerHTML = "";
-    cards.innerHTML = '<div class="empty-state">No qualifying ideas in today\'s run.</div>';
+    cards.innerHTML = isSectorView
+      ? `<div class="empty-state">No qualifying ideas in ${focusSectorFilter} today.</div>`
+      : '<div class="empty-state">No qualifying ideas in today\'s run.</div>';
     return;
   }
 
@@ -750,8 +912,10 @@ function sortAndRenderConv(){
     <tr>
       <td class="ticker">${r.Sub_Sector}</td>
       <td>${r.sector}</td>
+      <td class="num">${r.n_accumulating}/${r.n_total}</td>
       <td class="num">${fmt(r.breadth_pct,1)}%</td>
       <td class="num">${fmt(r.avg_basedays,0)}</td>
+      <td class="num">${fmt(r.avg_followthru,3)}</td>
       <td class="num score-cell">${fmt(r.conviction,1)}</td>
       <td>${cleanTicker(r.top_stock)}</td>
     </tr>
@@ -771,8 +935,10 @@ function sortAndRenderConv(){
       </div>
       <div class="conv-bar-track"><div class="conv-bar-fill" style="width:${Math.min(r.conviction,100)}%"></div></div>
       <div class="card-meta" style="margin-top:8px;">
+        <span>Accumulating <b>${r.n_accumulating}/${r.n_total}</b></span>
         <span>Breadth <b>${fmt(r.breadth_pct,1)}%</b></span>
         <span>Avg Base Days <b>${fmt(r.avg_basedays,0)}</b></span>
+        <span>Avg Follow-Thru <b>${fmt(r.avg_followthru,3)}</b></span>
       </div>
     </div>
   `).join("");
@@ -858,19 +1024,45 @@ function renderDispTable(rows, bodyId, cardsId, kind){
 }
 
 function sortAndRenderDisp(){
-  renderDispTable(sortRows(dispUpData, dispUpSort), "dispUpBody", "dispUpCards", "up displacement");
-  renderDispTable(sortRows(dispDnData, dispDnSort), "dispDnBody", "dispDnCards", "down displacement");
+  const isSectorView = dispSectorFilter !== "__all__";
+
+  const scopedUp = isSectorView ? dispUpData.filter(r => r.Sector === dispSectorFilter) : dispUpData;
+  const sortedUp = sortRows(scopedUp, dispUpSort);
+  const rowsUp = isSectorView ? sortedUp.slice(0, SECTOR_DRILLDOWN_LIMIT) : sortedUp;
+
+  const scopedDn = isSectorView ? dispDnData.filter(r => r.Sector === dispSectorFilter) : dispDnData;
+  const sortedDn = sortRows(scopedDn, dispDnSort);
+  const rowsDn = isSectorView ? sortedDn.slice(0, SECTOR_DRILLDOWN_LIMIT) : sortedDn;
+
+  const caption = document.getElementById("dispSectorCaption");
+  caption.textContent = isSectorView
+    ? `Showing top ${Math.min(SECTOR_DRILLDOWN_LIMIT, scopedUp.length)} of ${scopedUp.length} up, top ${Math.min(SECTOR_DRILLDOWN_LIMIT, scopedDn.length)} of ${scopedDn.length} down`
+    : "";
+
+  renderDispTable(rowsUp, "dispUpBody", "dispUpCards", isSectorView ? `up displacement in ${dispSectorFilter}` : "up displacement");
+  renderDispTable(rowsDn, "dispDnBody", "dispDnCards", isSectorView ? `down displacement in ${dispSectorFilter}` : "down displacement");
   renderDispTable(sortRows(dispSectorData, dispSectorSort), "dispSectorBody", "dispSectorCards", "sector conviction");
 }
 
 function sortAndRenderTheme(){
-  const rows = sortRows(themeData, themeSort);
+  const isSectorView = themeSectorFilter !== "__all__";
+  const scoped = isSectorView ? themeData.filter(r => r.Sector === themeSectorFilter) : themeData;
+  const sorted = sortRows(scoped, themeSort);
+  const rows = isSectorView ? sorted.slice(0, SECTOR_DRILLDOWN_LIMIT) : sorted;
+
+  const caption = document.getElementById("themeSectorCaption");
+  caption.textContent = isSectorView
+    ? `Showing top ${Math.min(SECTOR_DRILLDOWN_LIMIT, scoped.length)} of ${scoped.length}, sorted by ${themeSort.key}`
+    : "";
+
   const body = document.getElementById("themeBody");
   const cards = document.getElementById("themeCards");
 
   if(!rows.length){
     body.innerHTML = "";
-    cards.innerHTML = '<div class="empty-state">No theme conviction data in today\'s run.</div>';
+    cards.innerHTML = isSectorView
+      ? `<div class="empty-state">No themes in ${themeSectorFilter} today.</div>`
+      : '<div class="empty-state">No theme conviction data in today\'s run.</div>';
     return;
   }
 
