@@ -203,6 +203,19 @@
   .tag.Top5Badge{background:var(--gold-bg);color:var(--gold);}
   .score-cell{font-weight:600;}
 
+  /* Single-cell clickable ticker reference (e.g. Theme Conviction's
+     Lead_Stock) -- used where the surrounding row is NOT itself a stock
+     (it's a sub-sector theme), so only this one reference should read as
+     clickable, distinct from a whole-row-clickable pattern elsewhere. */
+  .ticker-link{
+    cursor:pointer;
+    text-decoration:underline;
+    text-decoration-color:var(--line);
+    text-underline-offset:2px;
+    transition:color .15s ease, text-decoration-color .15s ease;
+  }
+  .ticker-link:hover{color:var(--teal);text-decoration-color:var(--teal);}
+
   .disp-subhead{
     font-family:'Space Grotesk',sans-serif;
     font-weight:600;
@@ -281,6 +294,7 @@
     border-bottom:1px solid #EEEFEC;
   }
   .rrg-stock-table tbody tr:last-child td{border-bottom:none;}
+  .rrg-stock-table tbody tr{cursor:pointer;}
   .rrg-stock-table tbody tr:hover{background:#F2F3F0;}
   .rrg-empty-detail{padding:10px 14px 16px 34px;font-size:12.5px;color:var(--sub);}
 
@@ -307,7 +321,10 @@
     padding:6px 8px;
     background:#FBFBFA;
     border-radius:6px;
+    cursor:pointer;
+    transition:background .15s ease;
   }
+  .card-stock-row:hover{background:#F2F3F0;}
   .card-stock-row .cs-ticker{font-weight:600;font-family:'Space Grotesk',sans-serif;}
   .card-stock-row .cs-meta{color:var(--sub);font-family:'IBM Plex Mono',monospace;font-size:11px;}
 
@@ -403,6 +420,8 @@
   /* ---- Ticker chart detail view (Focus Screen) ---- */
   #focusBody tr{cursor:pointer;}
   #focusCards .card{cursor:pointer;}
+  #dispUpBody tr, #dispDnBody tr{cursor:pointer;}
+  #dispUpCards .card, #dispDnCards .card{cursor:pointer;}
 
   .chart-back-btn{
     display:inline-flex;
@@ -456,45 +475,31 @@
   </div>
 
   <div class="panel active" id="panel-focus">
-    <div id="focusListView">
-      <div class="sector-filter-bar">
-        <label for="focusSectorFilter">Sector</label>
-        <select id="focusSectorFilter">
-          <option value="__all__">All Sectors</option>
-        </select>
-        <span class="sector-filter-caption" id="focusSectorCaption"></span>
-      </div>
-      <table id="focusTable">
-        <thead>
-          <tr>
-            <th data-key="Ticker">Ticker</th>
-            <th data-key="Sector">Sector</th>
-            <th data-key="Type">Type</th>
-            <th data-key="Price" class="num">Price</th>
-            <th data-key="Ratio" class="num">Ratio</th>
-            <th data-key="BaseDays" class="num">Base Days</th>
-            <th data-key="TrendQuality" class="num">Trend</th>
-            <th data-key="Absorption" class="num">Absorption</th>
-            <th data-key="FollowThrough" class="num">Follow-Thru</th>
-            <th data-key="PM_Score" class="num">PM Score</th>
-          </tr>
-        </thead>
-        <tbody id="focusBody"></tbody>
-      </table>
-      <div class="cards" id="focusCards"></div>
+    <div class="sector-filter-bar">
+      <label for="focusSectorFilter">Sector</label>
+      <select id="focusSectorFilter">
+        <option value="__all__">All Sectors</option>
+      </select>
+      <span class="sector-filter-caption" id="focusSectorCaption"></span>
     </div>
-
-    <div id="focusChartView" style="display:none;">
-      <button class="chart-back-btn" id="focusChartBack">&larr; Back to list</button>
-      <div class="chart-ticker-header">
-        <div class="chart-ticker-name" id="chartTickerName"></div>
-        <div class="chart-ticker-sub" id="chartTickerSub"></div>
-      </div>
-      <div class="chart-wrap">
-        <canvas id="tickerChart"></canvas>
-      </div>
-      <p class="chart-legend-note" id="chartLegendNote"></p>
-    </div>
+    <table id="focusTable">
+      <thead>
+        <tr>
+          <th data-key="Ticker">Ticker</th>
+          <th data-key="Sector">Sector</th>
+          <th data-key="Type">Type</th>
+          <th data-key="Price" class="num">Price</th>
+          <th data-key="Ratio" class="num">Ratio</th>
+          <th data-key="BaseDays" class="num">Base Days</th>
+          <th data-key="TrendQuality" class="num">Trend</th>
+          <th data-key="Absorption" class="num">Absorption</th>
+          <th data-key="FollowThrough" class="num">Follow-Thru</th>
+          <th data-key="PM_Score" class="num">PM Score</th>
+        </tr>
+      </thead>
+      <tbody id="focusBody"></tbody>
+    </table>
+    <div class="cards" id="focusCards"></div>
   </div>
 
   <div class="panel" id="panel-conviction">
@@ -648,6 +653,21 @@
     </div>
     <div class="ask-buttons" id="askButtons"></div>
     <div class="ask-answer-box" id="askAnswerBox" style="display:none;"></div>
+  </div>
+
+  <!-- Shared ticker chart detail view -- NOT a .panel, so tab-switching CSS
+       doesn't touch it. Any tab can open this (see openTickerChart()); it
+       always hides whichever panel was active and restores it on "Back". -->
+  <div id="tickerChartView" style="display:none;">
+    <button class="chart-back-btn" id="tickerChartBack">&larr; Back</button>
+    <div class="chart-ticker-header">
+      <div class="chart-ticker-name" id="chartTickerName"></div>
+      <div class="chart-ticker-sub" id="chartTickerSub"></div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="tickerChart"></canvas>
+    </div>
+    <p class="chart-legend-note" id="chartLegendNote"></p>
   </div>
 </div>
 
@@ -853,7 +873,10 @@ document.getElementById("focusSectorFilter").addEventListener("change", (e)=>{
 function populateThemeSectorFilter(){
   const sel = document.getElementById("themeSectorFilter");
   const counts = {};
-  themeData.forEach(r => { counts[r.Sector] = (counts[r.Sector] || 0) + 1; });
+  themeData.forEach(r => {
+    const sector = getSectorForSubSector(r.Sub_Sector) || "Other";
+    counts[sector] = (counts[sector] || 0) + 1;
+  });
   const sectors = Object.keys(counts).sort();
 
   if(themeSectorFilter !== "__all__" && !sectors.includes(themeSectorFilter)){
@@ -955,29 +978,82 @@ function sortAndRenderFocus(){
   `).join("");
 }
 
-// ---- Ticker chart detail view (Focus Screen) ----
-// Clicking any row/card swaps #focusListView out for #focusChartView and
-// renders a single static Close/EMA12/EMA26 line chart from
-// priceSeriesData -- whatever point count the backend resolved (270 or
-// 180 trading days) for that ticker. No range toggle, no re-slicing,
-// no re-fetching: the whole series from price_series.json is drawn as-is.
+// ---- Ticker chart detail view (shared across tabs) ----
+// Any tab can call openTickerChart(ticker): it hides whichever panel is
+// currently active, shows the shared #tickerChartView, and renders a
+// single static Close/EMA12/EMA26 line chart from priceSeriesData --
+// whatever point count the backend resolved (270 or 180 trading days)
+// for that ticker. "Back" always restores the panel that opened it, so
+// Focus Screen -> back to list, Displacement -> back to Up/Down tables,
+// etc., without any tab-specific chart-view code.
+
+let chartReturnPanelId = null;
+
+// Looks across every dataset currently loaded for a Name/Sector to show
+// under the ticker in the chart header. Focus Screen rows carry a Name;
+// Displacement/RRG rows don't, so those charts show just the sector
+// (or, for Theme, the sub-sector -- see findTickerMeta's Theme branch).
+function findTickerMeta(ticker){
+  const inFocus = focusData.find(r => r.Ticker === ticker);
+  if(inFocus) return { name: inFocus.Name, sector: inFocus.Sector };
+  const inUp = dispUpData.find(r => r.Ticker === ticker);
+  if(inUp) return { name: null, sector: inUp.Sector };
+  const inDn = dispDnData.find(r => r.Ticker === ticker);
+  if(inDn) return { name: null, sector: inDn.Sector };
+  for(const sub of rrgData){
+    if((sub.Top_Stocks || []).some(s => s.Ticker === ticker)) return { name: null, sector: sub.Sector };
+  }
+  const inTheme = themeData.find(t => t.Lead_Stock === ticker);
+  // Theme rows don't carry a Sector field at all (only Sub_Sector -- see
+  // getSectorForSubSector() for why), so fall back to the sub-sector name
+  // itself rather than showing a blank subtitle.
+  if(inTheme) return { name: null, sector: inTheme.Sub_Sector };
+  return { name: null, sector: null };
+}
+
+// BUG FIX (found while wiring the Theme chart click-through): theme
+// entries from theme_conviction.themes carry Sub_Sector but never a
+// Sector field -- confirmed against the actual API payload, not assumed.
+// The Theme sector-filter dropdown (populateThemeSectorFilter, below)
+// was built earlier assuming r.Sector existed on theme rows; it silently
+// didn't, so the dropdown was populating a bogus "undefined (N)" option
+// and the filter matched nothing for any real sector name. This derives
+// Sector by looking up the same Sub_Sector name in RRG data first (it
+// has the widest sub-sector coverage of any dataset we load), falling
+// back to Focus Screen / Displacement data, both of which also carry
+// both fields on every row.
+function getSectorForSubSector(subSector){
+  const inRRG = rrgData.find(r => r.Sub_Sector === subSector);
+  if(inRRG) return inRRG.Sector;
+  const inFocus = focusData.find(r => r.Sub_Sector === subSector);
+  if(inFocus) return inFocus.Sector;
+  const inUp = dispUpData.find(r => r.Sub_Sector === subSector);
+  if(inUp) return inUp.Sector;
+  const inDn = dispDnData.find(r => r.Sub_Sector === subSector);
+  if(inDn) return inDn.Sector;
+  return null;
+}
 
 function openTickerChart(ticker){
   currentChartTicker = ticker;
 
-  document.getElementById("focusListView").style.display = "none";
-  document.getElementById("focusChartView").style.display = "block";
+  const activePanel = document.querySelector(".panel.active");
+  chartReturnPanelId = activePanel ? activePanel.id : "panel-focus";
+  if(activePanel) activePanel.classList.remove("active");
 
-  const row = focusData.find(r => r.Ticker === ticker) || {};
+  document.getElementById("tickerChartView").style.display = "block";
+
+  const meta = findTickerMeta(ticker);
   document.getElementById("chartTickerName").textContent = cleanTicker(ticker);
-  document.getElementById("chartTickerSub").textContent = [row.Name, row.Sector].filter(Boolean).join(" · ");
+  document.getElementById("chartTickerSub").textContent = [meta.name, meta.sector].filter(Boolean).join(" · ");
 
   renderTickerChart();
 }
 
 function closeTickerChart(){
-  document.getElementById("focusChartView").style.display = "none";
-  document.getElementById("focusListView").style.display = "block";
+  document.getElementById("tickerChartView").style.display = "none";
+  const returnPanel = document.getElementById(chartReturnPanelId || "panel-focus");
+  if(returnPanel) returnPanel.classList.add("active");
   if(tickerChartInstance){
     tickerChartInstance.destroy();
     tickerChartInstance = null;
@@ -986,12 +1062,12 @@ function closeTickerChart(){
 }
 
 function renderTickerChart(){
-  const wrap = document.querySelector("#focusChartView .chart-wrap");
+  const wrap = document.querySelector("#tickerChartView .chart-wrap");
   const note = document.getElementById("chartLegendNote");
   const series = priceSeriesData[currentChartTicker];
 
   if(!series || !series.dates || !series.dates.length){
-    wrap.innerHTML = `<div class="empty-state">No chart data yet for ${cleanTicker(currentChartTicker)} — new entrants to the list get chart data starting with the next daily run.</div>`;
+    wrap.innerHTML = `<div class="empty-state">No chart data yet for ${cleanTicker(currentChartTicker)} — new entrants get chart data starting with the next daily run.</div>`;
     note.textContent = "";
     return;
   }
@@ -1031,6 +1107,9 @@ function renderTickerChart(){
   note.textContent = `${series.dates.length} trading days shown · ${series.dates[0]} to ${series.dates[series.dates.length - 1]}`;
 }
 
+// Delegated click handlers -- one pair per clickable table/card container.
+// Each just needs data-ticker on its rows/cards (added in the relevant
+// render function) and calls the same shared openTickerChart().
 document.getElementById("focusBody").addEventListener("click", (e)=>{
   const row = e.target.closest("tr[data-ticker]");
   if(!row) return;
@@ -1043,7 +1122,29 @@ document.getElementById("focusCards").addEventListener("click", (e)=>{
   openTickerChart(card.dataset.ticker);
 });
 
-document.getElementById("focusChartBack").addEventListener("click", closeTickerChart);
+document.getElementById("dispUpBody").addEventListener("click", (e)=>{
+  const row = e.target.closest("tr[data-ticker]");
+  if(!row) return;
+  openTickerChart(row.dataset.ticker);
+});
+document.getElementById("dispUpCards").addEventListener("click", (e)=>{
+  const card = e.target.closest(".card[data-ticker]");
+  if(!card) return;
+  openTickerChart(card.dataset.ticker);
+});
+
+document.getElementById("dispDnBody").addEventListener("click", (e)=>{
+  const row = e.target.closest("tr[data-ticker]");
+  if(!row) return;
+  openTickerChart(row.dataset.ticker);
+});
+document.getElementById("dispDnCards").addEventListener("click", (e)=>{
+  const card = e.target.closest(".card[data-ticker]");
+  if(!card) return;
+  openTickerChart(card.dataset.ticker);
+});
+
+document.getElementById("tickerChartBack").addEventListener("click", closeTickerChart);
 
 function sortAndRenderConv(){
   const rows = sortRows(convData, convSort);
@@ -1137,7 +1238,7 @@ function renderDispTable(rows, bodyId, cardsId, kind){
   }
 
   body.innerHTML = rows.map(r => `
-    <tr>
+    <tr data-ticker="${r.Ticker}">
       <td class="ticker">${cleanTicker(r.Ticker)}</td>
       <td>${r.Sector}<span class="name-sub">${r.Sub_Sector || ""}</span></td>
       <td class="num">₹${fmt(r.Price)}</td>
@@ -1150,7 +1251,7 @@ function renderDispTable(rows, bodyId, cardsId, kind){
   `).join("");
 
   cards.innerHTML = rows.map(r => `
-    <div class="card">
+    <div class="card" data-ticker="${r.Ticker}">
       <div class="card-top">
         <div>
           <div class="card-ticker">${cleanTicker(r.Ticker)}</div>
@@ -1194,7 +1295,7 @@ function sortAndRenderDisp(){
 
 function sortAndRenderTheme(){
   const isSectorView = themeSectorFilter !== "__all__";
-  const scoped = isSectorView ? themeData.filter(r => r.Sector === themeSectorFilter) : themeData;
+  const scoped = isSectorView ? themeData.filter(r => (getSectorForSubSector(r.Sub_Sector) || "Other") === themeSectorFilter) : themeData;
   const sorted = sortRows(scoped, themeSort);
   const rows = isSectorView ? sorted.slice(0, SECTOR_DRILLDOWN_LIMIT) : sorted;
 
@@ -1224,7 +1325,7 @@ function sortAndRenderTheme(){
       <td class="num">${fmt(r.DQ,1)}</td>
       <td class="num score-cell">${fmt(r.Conviction,1)}</td>
       <td><span class="tag ${r.Driver}">${r.Driver}</span></td>
-      <td>${cleanTicker(r.Lead_Stock)}</td>
+      <td><span class="ticker-link" data-ticker="${r.Lead_Stock}">${cleanTicker(r.Lead_Stock)}</span></td>
     </tr>
   `).join("");
 
@@ -1233,7 +1334,7 @@ function sortAndRenderTheme(){
       <div class="card-top">
         <div>
           <div class="card-ticker">${r.Sub_Sector}</div>
-          <div class="card-name">${r.Stocks} stocks · <span class="tag ${r.Driver}">${r.Driver}</span> driven · lead: ${cleanTicker(r.Lead_Stock)}</div>
+          <div class="card-name">${r.Stocks} stocks · <span class="tag ${r.Driver}">${r.Driver}</span> driven · lead: <span class="ticker-link" data-ticker="${r.Lead_Stock}">${cleanTicker(r.Lead_Stock)}</span></div>
         </div>
         <div>
           <div class="card-score">${fmt(r.Conviction,1)}</div>
@@ -1256,6 +1357,22 @@ function sortAndRenderTheme(){
   `).join("");
 }
 
+// Theme rows are sub-sector themes, not individual stocks -- only the
+// Lead_Stock reference (a .ticker-link span, added above) should open a
+// chart, not the whole row. Delegated on the container so newly-rendered
+// rows are covered automatically without re-attaching listeners.
+document.getElementById("themeBody").addEventListener("click", (e)=>{
+  const link = e.target.closest(".ticker-link[data-ticker]");
+  if(!link) return;
+  openTickerChart(link.dataset.ticker);
+});
+
+document.getElementById("themeCards").addEventListener("click", (e)=>{
+  const link = e.target.closest(".ticker-link[data-ticker]");
+  if(!link) return;
+  openTickerChart(link.dataset.ticker);
+});
+
 function highBadges(r){
   const b13 = r.is_13w_high ? "active" : "";
   const b26 = r.is_26w_high ? "active" : "";
@@ -1273,7 +1390,7 @@ function renderRRGStockDetail(subSectorRow){
     return `<div class="rrg-empty-detail">No individual stock data available for this sub-sector.</div>`;
   }
   const rowsHtml = stocks.map(s => `
-    <tr>
+    <tr data-ticker="${s.Ticker}">
       <td class="ticker">${cleanTicker(s.Ticker)}</td>
       <td class="num">₹${fmt(s.Price)}</td>
       <td class="num">${fmt(s.rs_ratio,3)}</td>
@@ -1341,7 +1458,7 @@ function sortAndRenderRRG(){
   cards.innerHTML = rows.map(r => {
     const stocks = r.Top_Stocks || [];
     const stocksHtml = stocks.map(s => `
-      <div class="card-stock-row">
+      <div class="card-stock-row" data-ticker="${s.Ticker}">
         <span class="cs-ticker">${cleanTicker(s.Ticker)}</span>
         <span class="cs-meta">₹${fmt(s.Price)} · ${s.mom_4w_pct >= 0 ? '+' : ''}${fmt(s.mom_4w_pct,1)}% · ${fmt(s.stock_score,0)}</span>
       </div>
@@ -1371,6 +1488,20 @@ function sortAndRenderRRG(){
 }
 
 document.getElementById("rrgBody").addEventListener("click", (e)=>{
+  // Stock-level click (a row inside an expanded sub-sector's Top_Stocks
+  // detail table) is checked FIRST, since those rows sit nested inside
+  // the section row's rendered output. closest() starts at the actual
+  // click target and walks outward, so a click on a stock row matches
+  // "tr[data-ticker]" immediately -- the outer .rrg-row (which carries
+  // data-subsector, never data-ticker) is only reached, and only
+  // matches, when the click was NOT on a stock row. No stopPropagation
+  // needed: the two selectors are mutually exclusive by construction.
+  const stockRow = e.target.closest("tr[data-ticker]");
+  if(stockRow){
+    openTickerChart(stockRow.dataset.ticker);
+    return;
+  }
+
   const row = e.target.closest(".rrg-row");
   if(!row) return;
   const key = row.dataset.subsector;
@@ -1380,6 +1511,18 @@ document.getElementById("rrgBody").addEventListener("click", (e)=>{
 });
 
 document.getElementById("rrgCards").addEventListener("click", (e)=>{
+  // Same precedence logic as rrgBody above: a stock row click is checked
+  // first. In the card layout these are structurally separate anyway
+  // (.card-stock-row sits inside .card-top-stocks, never inside the
+  // toggle <button>), so this ordering is a formality here rather than
+  // a strict requirement -- but keeping it consistent with the table
+  // handler avoids having to remember two different conventions.
+  const stockRow = e.target.closest(".card-stock-row[data-ticker]");
+  if(stockRow){
+    openTickerChart(stockRow.dataset.ticker);
+    return;
+  }
+
   const btn = e.target.closest("[data-subsector-toggle]");
   if(!btn) return;
   const key = btn.dataset.subsectorToggle;
@@ -1461,6 +1604,13 @@ function renderRRGChart(chartSeries, rebaseDate, asOfWeek){
 
 document.querySelectorAll(".tab-btn").forEach(btn=>{
   btn.addEventListener("click", ()=>{
+    // If the chart view is open, switching tabs directly (rather than
+    // clicking "Back") should still leave things in a consistent state --
+    // close it first so we don't end up with the chart floating over the
+    // wrong tab, or a hidden panel never getting reactivated.
+    if(document.getElementById("tickerChartView").style.display !== "none"){
+      closeTickerChart();
+    }
     document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
     document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
     btn.classList.add("active");
