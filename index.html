@@ -399,6 +399,32 @@
 
   .conv-bar-track{width:100%;height:6px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:4px;}
   .conv-bar-fill{height:100%;background:var(--teal);border-radius:4px;}
+
+  /* ---- Ticker chart detail view (Focus Screen) ---- */
+  #focusBody tr{cursor:pointer;}
+  #focusCards .card{cursor:pointer;}
+
+  .chart-back-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    color:var(--sub);
+    background:none;
+    border:none;
+    cursor:pointer;
+    padding:6px 0;
+    margin-bottom:14px;
+  }
+  .chart-back-btn:hover{color:var(--ink);}
+
+  .chart-ticker-header{margin-bottom:14px;}
+  .chart-ticker-name{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;}
+  .chart-ticker-sub{color:var(--sub);font-size:13px;margin-top:2px;}
+
+  .chart-legend-note{font-size:12px;color:var(--sub);margin-top:10px;}
 </style>
 </head>
 <body>
@@ -430,31 +456,45 @@
   </div>
 
   <div class="panel active" id="panel-focus">
-    <div class="sector-filter-bar">
-      <label for="focusSectorFilter">Sector</label>
-      <select id="focusSectorFilter">
-        <option value="__all__">All Sectors</option>
-      </select>
-      <span class="sector-filter-caption" id="focusSectorCaption"></span>
+    <div id="focusListView">
+      <div class="sector-filter-bar">
+        <label for="focusSectorFilter">Sector</label>
+        <select id="focusSectorFilter">
+          <option value="__all__">All Sectors</option>
+        </select>
+        <span class="sector-filter-caption" id="focusSectorCaption"></span>
+      </div>
+      <table id="focusTable">
+        <thead>
+          <tr>
+            <th data-key="Ticker">Ticker</th>
+            <th data-key="Sector">Sector</th>
+            <th data-key="Type">Type</th>
+            <th data-key="Price" class="num">Price</th>
+            <th data-key="Ratio" class="num">Ratio</th>
+            <th data-key="BaseDays" class="num">Base Days</th>
+            <th data-key="TrendQuality" class="num">Trend</th>
+            <th data-key="Absorption" class="num">Absorption</th>
+            <th data-key="FollowThrough" class="num">Follow-Thru</th>
+            <th data-key="PM_Score" class="num">PM Score</th>
+          </tr>
+        </thead>
+        <tbody id="focusBody"></tbody>
+      </table>
+      <div class="cards" id="focusCards"></div>
     </div>
-    <table id="focusTable">
-      <thead>
-        <tr>
-          <th data-key="Ticker">Ticker</th>
-          <th data-key="Sector">Sector</th>
-          <th data-key="Type">Type</th>
-          <th data-key="Price" class="num">Price</th>
-          <th data-key="Ratio" class="num">Ratio</th>
-          <th data-key="BaseDays" class="num">Base Days</th>
-          <th data-key="TrendQuality" class="num">Trend</th>
-          <th data-key="Absorption" class="num">Absorption</th>
-          <th data-key="FollowThrough" class="num">Follow-Thru</th>
-          <th data-key="PM_Score" class="num">PM Score</th>
-        </tr>
-      </thead>
-      <tbody id="focusBody"></tbody>
-    </table>
-    <div class="cards" id="focusCards"></div>
+
+    <div id="focusChartView" style="display:none;">
+      <button class="chart-back-btn" id="focusChartBack">&larr; Back to list</button>
+      <div class="chart-ticker-header">
+        <div class="chart-ticker-name" id="chartTickerName"></div>
+        <div class="chart-ticker-sub" id="chartTickerSub"></div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="tickerChart"></canvas>
+      </div>
+      <p class="chart-legend-note" id="chartLegendNote"></p>
+    </div>
   </div>
 
   <div class="panel" id="panel-conviction">
@@ -615,6 +655,7 @@
 <script>
 const DATA_URL = "https://raw.githubusercontent.com/zeeshan141188-hash/india-equity-dashboard-output/main/latest.json";
 const QA_URL = DATA_URL.replace("latest.json", "qa.json");
+const PRICE_SERIES_URL = DATA_URL.replace("latest.json", "price_series.json");
 
 // How many rows to show when a specific sector is selected in the Focus
 // Screen filter -- mirrors BQNT's "Top 10: {Sector}" drill-down, kept at 5
@@ -623,6 +664,9 @@ const QA_URL = DATA_URL.replace("latest.json", "qa.json");
 const SECTOR_DRILLDOWN_LIMIT = 5;
 
 let qaData = [];
+let priceSeriesData = {};   // keyed by ticker: { dates, close, ema12, ema26 }
+let tickerChartInstance = null;
+let currentChartTicker = null;
 let focusData = [];
 let convData = [];
 let dispUpData = [];
@@ -752,6 +796,20 @@ async function loadQA(){
   }
 }
 
+// Loaded independently of loadData()/loadQA() -- a failure here should never
+// block the main list from working. Clicking a ticker just falls back to an
+// empty-state message if this hasn't loaded (see renderTickerChart()).
+async function loadPriceSeries(){
+  try{
+    const res = await fetch(PRICE_SERIES_URL, {cache: "no-store"});
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const json = await res.json();
+    priceSeriesData = json.series || {};
+  }catch(err){
+    priceSeriesData = {};
+  }
+}
+
 function sortRows(rows, sortState){
   const {key, dir} = sortState;
   return [...rows].sort((a,b)=>{
@@ -859,7 +917,7 @@ function sortAndRenderFocus(){
   }
 
   body.innerHTML = rows.map(r => `
-    <tr>
+    <tr data-ticker="${r.Ticker}">
       <td class="ticker">${cleanTicker(r.Ticker)}<span class="name-sub">${r.Name || ""}</span></td>
       <td>${r.Sector}<span class="name-sub">${r.Sub_Sector || ""}</span></td>
       <td><span class="tag ${r.Type}">${r.Type}</span></td>
@@ -874,7 +932,7 @@ function sortAndRenderFocus(){
   `).join("");
 
   cards.innerHTML = rows.map(r => `
-    <div class="card">
+    <div class="card" data-ticker="${r.Ticker}">
       <div class="card-top">
         <div>
           <div class="card-ticker">${cleanTicker(r.Ticker)}</div>
@@ -896,6 +954,96 @@ function sortAndRenderFocus(){
     </div>
   `).join("");
 }
+
+// ---- Ticker chart detail view (Focus Screen) ----
+// Clicking any row/card swaps #focusListView out for #focusChartView and
+// renders a single static Close/EMA12/EMA26 line chart from
+// priceSeriesData -- whatever point count the backend resolved (270 or
+// 180 trading days) for that ticker. No range toggle, no re-slicing,
+// no re-fetching: the whole series from price_series.json is drawn as-is.
+
+function openTickerChart(ticker){
+  currentChartTicker = ticker;
+
+  document.getElementById("focusListView").style.display = "none";
+  document.getElementById("focusChartView").style.display = "block";
+
+  const row = focusData.find(r => r.Ticker === ticker) || {};
+  document.getElementById("chartTickerName").textContent = cleanTicker(ticker);
+  document.getElementById("chartTickerSub").textContent = [row.Name, row.Sector].filter(Boolean).join(" · ");
+
+  renderTickerChart();
+}
+
+function closeTickerChart(){
+  document.getElementById("focusChartView").style.display = "none";
+  document.getElementById("focusListView").style.display = "block";
+  if(tickerChartInstance){
+    tickerChartInstance.destroy();
+    tickerChartInstance = null;
+  }
+  currentChartTicker = null;
+}
+
+function renderTickerChart(){
+  const wrap = document.querySelector("#focusChartView .chart-wrap");
+  const note = document.getElementById("chartLegendNote");
+  const series = priceSeriesData[currentChartTicker];
+
+  if(!series || !series.dates || !series.dates.length){
+    wrap.innerHTML = `<div class="empty-state">No chart data yet for ${cleanTicker(currentChartTicker)} — new entrants to the list get chart data starting with the next daily run.</div>`;
+    note.textContent = "";
+    return;
+  }
+
+  // A previous ticker with no data may have replaced the canvas with an
+  // empty-state div above -- restore it before drawing.
+  if(!document.getElementById("tickerChart")){
+    wrap.innerHTML = '<canvas id="tickerChart"></canvas>';
+  }
+
+  if(tickerChartInstance) tickerChartInstance.destroy();
+  tickerChartInstance = new Chart(document.getElementById("tickerChart").getContext("2d"), {
+    type: "line",
+    data: {
+      labels: series.dates,
+      datasets: [
+        { label: "Close", data: series.close, borderColor: "#14171A", backgroundColor: "#14171A", borderWidth: 2, pointRadius: 0, tension: 0.1 },
+        { label: "EMA 12", data: series.ema12, borderColor: "#2B6E63", backgroundColor: "#2B6E63", borderWidth: 1.5, pointRadius: 0, tension: 0.1 },
+        { label: "EMA 26", data: series.ema26, borderColor: "#5B4B8A", backgroundColor: "#5B4B8A", borderWidth: 1.5, pointRadius: 0, tension: 0.1 },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ₹${ctx.parsed.y.toFixed(2)}` } }
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 7, font: { size: 10 } } },
+        y: { ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+
+  note.textContent = `${series.dates.length} trading days shown · ${series.dates[0]} to ${series.dates[series.dates.length - 1]}`;
+}
+
+document.getElementById("focusBody").addEventListener("click", (e)=>{
+  const row = e.target.closest("tr[data-ticker]");
+  if(!row) return;
+  openTickerChart(row.dataset.ticker);
+});
+
+document.getElementById("focusCards").addEventListener("click", (e)=>{
+  const card = e.target.closest(".card[data-ticker]");
+  if(!card) return;
+  openTickerChart(card.dataset.ticker);
+});
+
+document.getElementById("focusChartBack").addEventListener("click", closeTickerChart);
 
 function sortAndRenderConv(){
   const rows = sortRows(convData, convSort);
@@ -1505,6 +1653,7 @@ document.querySelectorAll("#rrgTable thead th").forEach(th=>{
 
 loadData();
 loadQA();
+loadPriceSeries();
 </script>
 </body>
 </html>
