@@ -991,8 +991,9 @@ let chartReturnPanelId = null;
 
 // Looks across every dataset currently loaded for a Name/Sector to show
 // under the ticker in the chart header. Focus Screen rows carry a Name;
-// Displacement/RRG rows don't, so those charts show just the sector
-// (or, for Theme, the sub-sector -- see findTickerMeta's Theme branch).
+// Displacement/RRG/Conviction rows don't, so those charts show just the
+// sector (or sub-sector, where that's the only field available -- see
+// the Theme and Sub-Sector Conviction branches below).
 function findTickerMeta(ticker){
   const inFocus = focusData.find(r => r.Ticker === ticker);
   if(inFocus) return { name: inFocus.Name, sector: inFocus.Sector };
@@ -1000,9 +1001,15 @@ function findTickerMeta(ticker){
   if(inUp) return { name: null, sector: inUp.Sector };
   const inDn = dispDnData.find(r => r.Ticker === ticker);
   if(inDn) return { name: null, sector: inDn.Sector };
+  const inDispSector = dispSectorData.find(r => r.Top_Horse === ticker);
+  if(inDispSector) return { name: null, sector: inDispSector.Sector };
   for(const sub of rrgData){
     if((sub.Top_Stocks || []).some(s => s.Ticker === ticker)) return { name: null, sector: sub.Sector };
   }
+  const inConv = convData.find(r => r.top_stock === ticker);
+  // Sub-Sector Conviction rows use lowercase `sector` (see sortAndRenderConv) --
+  // deliberately matching the field name as-is rather than normalizing it here.
+  if(inConv) return { name: null, sector: inConv.sector };
   const inTheme = themeData.find(t => t.Lead_Stock === ticker);
   // Theme rows don't carry a Sector field at all (only Sub_Sector -- see
   // getSectorForSubSector() for why), so fall back to the sub-sector name
@@ -1146,6 +1153,18 @@ document.getElementById("dispDnCards").addEventListener("click", (e)=>{
 
 document.getElementById("tickerChartBack").addEventListener("click", closeTickerChart);
 
+// Single global handler for the .ticker-link pattern (single-cell-clickable
+// ticker references inside an otherwise non-stock row: Theme Conviction's
+// Lead_Stock, Sub-Sector Conviction's top_stock, Displacement's own Sector
+// Conviction Top_Horse). Registered once on `document` rather than per
+// container -- every current and future .ticker-link is covered
+// automatically, with no new listener needed when another tab gets one.
+document.addEventListener("click", (e)=>{
+  const link = e.target.closest(".ticker-link[data-ticker]");
+  if(!link) return;
+  openTickerChart(link.dataset.ticker);
+});
+
 function sortAndRenderConv(){
   const rows = sortRows(convData, convSort);
   const body = document.getElementById("convBody");
@@ -1166,7 +1185,7 @@ function sortAndRenderConv(){
       <td class="num">${fmt(r.avg_basedays,0)}</td>
       <td class="num">${fmt(r.avg_followthru,3)}</td>
       <td class="num score-cell">${fmt(r.conviction,1)}</td>
-      <td>${cleanTicker(r.top_stock)}</td>
+      <td><span class="ticker-link" data-ticker="${r.top_stock}">${cleanTicker(r.top_stock)}</span></td>
     </tr>
   `).join("");
 
@@ -1175,7 +1194,7 @@ function sortAndRenderConv(){
       <div class="card-top">
         <div>
           <div class="card-ticker">${r.Sub_Sector}</div>
-          <div class="card-name">${r.sector} · top: ${cleanTicker(r.top_stock)}</div>
+          <div class="card-name">${r.sector} · top: <span class="ticker-link" data-ticker="${r.top_stock}">${cleanTicker(r.top_stock)}</span></div>
         </div>
         <div>
           <div class="card-score">${fmt(r.conviction,1)}</div>
@@ -1212,7 +1231,7 @@ function renderDispTable(rows, bodyId, cardsId, kind){
         <td class="num">${fmt(r.Bear_Exp_Pct,1)}%</td>
         <td class="num">${fmt(r.Density_Z,2)}</td>
         <td class="num score-cell">${fmt(r.Conviction,1)}</td>
-        <td>${cleanTicker(r.Top_Horse)}</td>
+        <td><span class="ticker-link" data-ticker="${r.Top_Horse}">${cleanTicker(r.Top_Horse)}</span></td>
       </tr>
     `).join("");
     cards.innerHTML = rows.map(r => `
@@ -1220,7 +1239,7 @@ function renderDispTable(rows, bodyId, cardsId, kind){
         <div class="card-top">
           <div>
             <div class="card-ticker">${r.Sector}</div>
-            <div class="card-name">top: ${cleanTicker(r.Top_Horse)}</div>
+            <div class="card-name">top: <span class="ticker-link" data-ticker="${r.Top_Horse}">${cleanTicker(r.Top_Horse)}</span></div>
           </div>
           <div>
             <div class="card-score">${fmt(r.Conviction,1)}</div>
@@ -1357,21 +1376,12 @@ function sortAndRenderTheme(){
   `).join("");
 }
 
-// Theme rows are sub-sector themes, not individual stocks -- only the
-// Lead_Stock reference (a .ticker-link span, added above) should open a
-// chart, not the whole row. Delegated on the container so newly-rendered
-// rows are covered automatically without re-attaching listeners.
-document.getElementById("themeBody").addEventListener("click", (e)=>{
-  const link = e.target.closest(".ticker-link[data-ticker]");
-  if(!link) return;
-  openTickerChart(link.dataset.ticker);
-});
-
-document.getElementById("themeCards").addEventListener("click", (e)=>{
-  const link = e.target.closest(".ticker-link[data-ticker]");
-  if(!link) return;
-  openTickerChart(link.dataset.ticker);
-});
+// .ticker-link click handling is registered once, globally -- see the
+// single document-level listener near the other chart-view wiring below.
+// (Theme's Lead_Stock, Sub-Sector Conviction's top_stock, and
+// Displacement's own Sector Conviction Top_Horse all use this same
+// single-cell-clickable pattern, since each of those rows represents an
+// aggregate -- sub-sector or sector -- not an individual stock.)
 
 function highBadges(r){
   const b13 = r.is_13w_high ? "active" : "";
