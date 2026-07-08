@@ -124,7 +124,7 @@
   .panel{display:none;padding:0 16px;}
   .panel.active{display:block;}
 
-  /* ---- Sector filter bar ---- */
+  /* ---- Sector filter bar (Focus Screen) ---- */
   .sector-filter-bar{
     display:flex;
     align-items:center;
@@ -140,7 +140,7 @@
     text-transform:uppercase;
     letter-spacing:0.03em;
   }
-  select{
+  #focusSectorFilter{
     font-family:'Inter',sans-serif;
     font-size:13px;
     padding:7px 10px;
@@ -151,7 +151,7 @@
     cursor:pointer;
     max-width:100%;
   }
-  select:hover{border-color:var(--teal);}
+  #focusSectorFilter:hover{border-color:var(--teal);}
   .sector-filter-caption{
     font-size:12.5px;
     color:var(--sub);
@@ -173,7 +173,6 @@
   }
   thead th:hover{color:var(--ink);}
   thead th .arrow{opacity:0.4;margin-left:3px;font-size:10px;}
-  tbody tr{cursor:pointer;}
   tbody td{
     padding:11px 14px;
     border-bottom:1px solid var(--line);
@@ -204,6 +203,10 @@
   .tag.Top5Badge{background:var(--gold-bg);color:var(--gold);}
   .score-cell{font-weight:600;}
 
+  /* Single-cell clickable ticker reference (e.g. Theme Conviction's
+     Lead_Stock) -- used where the surrounding row is NOT itself a stock
+     (it's a sub-sector theme), so only this one reference should read as
+     clickable, distinct from a whole-row-clickable pattern elsewhere. */
   .ticker-link{
     cursor:pointer;
     text-decoration:underline;
@@ -331,7 +334,6 @@
     border-radius:var(--radius);
     padding:14px 16px;
     box-shadow:0 1px 2px rgba(20,23,26,0.05);
-    cursor:pointer;
   }
   .card.top5-card{background:var(--gold-bg);box-shadow:0 1px 2px rgba(168,132,43,0.15);}
   .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
@@ -415,6 +417,14 @@
   .conv-bar-track{width:100%;height:6px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:4px;}
   .conv-bar-fill{height:100%;background:var(--teal);border-radius:4px;}
 
+  /* ---- Ticker chart detail view (Focus Screen) ---- */
+  #focusBody tr{cursor:pointer;}
+  #focusCards .card{cursor:pointer;}
+  #dispUpBody tr, #dispDnBody tr{cursor:pointer;}
+  #dispUpCards .card, #dispDnCards .card{cursor:pointer;}
+  #grindBody tr{cursor:pointer;}
+  #grindCards .card{cursor:pointer;}
+
   .chart-back-btn{
     display:inline-flex;
     align-items:center;
@@ -459,11 +469,11 @@
 <div class="wrap">
   <div class="tabs">
     <button class="tab-btn active" data-tab="focus">Focus Screen</button>
-    <button class="tab-btn" data-tab="grind">Grind to Breakout</button>
     <button class="tab-btn" data-tab="conviction">Sub-Sector Conviction</button>
     <button class="tab-btn" data-tab="displacement">Displacement Scanner</button>
     <button class="tab-btn" data-tab="theme">Theme Conviction</button>
     <button class="tab-btn" data-tab="rrg">Sector Rotation</button>
+    <button class="tab-btn" data-tab="grind">Grind to Breakout</button>
     <button class="tab-btn" data-tab="ask">Ask</button>
   </div>
 
@@ -493,32 +503,6 @@
       <tbody id="focusBody"></tbody>
     </table>
     <div class="cards" id="focusCards"></div>
-  </div>
-
-  <div class="panel" id="panel-grind">
-    <div class="sector-filter-bar">
-      <label for="grindSectorFilter">Sector</label>
-      <select id="grindSectorFilter">
-        <option value="__all__">All Sectors</option>
-      </select>
-    </div>
-    <table id="grindTable">
-      <thead>
-        <tr>
-          <th data-key="Ticker">Ticker</th>
-          <th data-key="Sector">Sector</th>
-          <th data-key="Price" class="num">Price</th>
-          <th data-key="Ratio" class="num">Ratio</th>
-          <th data-key="BaseDays" class="num">Base Days</th>
-          <th data-key="TrendQuality" class="num">Trend</th>
-          <th data-key="Absorption" class="num">Absorption</th>
-          <th data-key="FollowThrough" class="num">Follow-Thru</th>
-          <th data-key="PM_Score" class="num">PM Score</th>
-        </tr>
-      </thead>
-      <tbody id="grindBody"></tbody>
-    </table>
-    <div class="cards" id="grindCards"></div>
   </div>
 
   <div class="panel" id="panel-conviction">
@@ -653,6 +637,27 @@
     <div class="cards" id="rrgCards"></div>
   </div>
 
+  <div class="panel" id="panel-grind">
+    <p class="sector-filter-caption" id="grindCaption" style="margin-bottom:14px;"></p>
+    <table id="grindTable">
+      <thead>
+        <tr>
+          <th data-key="ID">Ticker</th>
+          <th data-key="Sector">Sector</th>
+          <th data-key="continuation_px" class="num">Cont. Price</th>
+          <th data-key="ext_over_zone_pct" class="num">Ext over Zone %</th>
+          <th data-key="grind_days" class="num">Grind Days</th>
+          <th data-key="dq_score" class="num">DQ Score</th>
+          <th data-key="grind_quality_score" class="num">Grind Quality</th>
+          <th data-key="thrust_score" class="num">Thrust</th>
+          <th data-key="final_score" class="num">Final Score</th>
+        </tr>
+      </thead>
+      <tbody id="grindBody"></tbody>
+    </table>
+    <div class="cards" id="grindCards"></div>
+  </div>
+
   <div class="panel" id="panel-ask">
     <div class="ask-avatar-row">
       <div class="ask-avatar">
@@ -674,6 +679,9 @@
     <div class="ask-answer-box" id="askAnswerBox" style="display:none;"></div>
   </div>
 
+  <!-- Shared ticker chart detail view -- NOT a .panel, so tab-switching CSS
+       doesn't touch it. Any tab can open this (see openTickerChart()); it
+       always hides whichever panel was active and restores it on "Back". -->
   <div id="tickerChartView" style="display:none;">
     <button class="chart-back-btn" id="tickerChartBack">&larr; Back</button>
     <div class="chart-ticker-header">
@@ -693,38 +701,54 @@ const DATA_URL = "https://raw.githubusercontent.com/zeeshan141188-hash/india-equ
 const QA_URL = DATA_URL.replace("latest.json", "qa.json");
 const PRICE_SERIES_URL = DATA_URL.replace("latest.json", "price_series.json");
 
+// How many rows to show when a specific sector is selected in the Focus
+// Screen filter -- mirrors BQNT's "Top 10: {Sector}" drill-down, kept at 5
+// here since the website's per-sector counts are generally smaller than
+// BQNT's fuller universe.
 const SECTOR_DRILLDOWN_LIMIT = 5;
 
 let qaData = [];
-let priceSeriesData = {};   
+let priceSeriesData = {};   // keyed by ticker: { dates, close, ema12, ema26 }
 let tickerChartInstance = null;
 let currentChartTicker = null;
 let focusData = [];
-let grindData = [];
 let convData = [];
 let dispUpData = [];
 let dispDnData = [];
 let dispSectorData = [];
 let themeData = [];
 let rrgData = [];
-
+let grindData = [];
+let grindAsOfDate = null;
 let focusSort = { key: "PM_Score", dir: -1 };
-let grindSort = { key: "PM_Score", dir: -1 };
 let convSort = { key: "conviction", dir: -1 };
 let dispUpSort = { key: "Score", dir: -1 };
 let dispDnSort = { key: "Score", dir: -1 };
 let dispSectorSort = { key: "Conviction", dir: -1 };
 let themeSort = { key: "Conviction", dir: -1 };
 let rrgSort = { key: "Combined_Score", dir: -1 };
+let grindSort = { key: "final_score", dir: -1 };
 let rrgChartInstance = null;
 
+// Which sub-sector is currently selected in the Focus Screen sector filter.
+// "__all__" means no filter -- show every idea, unlimited, as before.
+// Kept as state OUTSIDE the render function so it survives re-renders
+// triggered by column-header sort clicks.
 let focusSectorFilter = "__all__";
-let grindSectorFilter = "__all__";
+
+// Same pattern, applied to Theme Conviction (filters sub-sector themes by
+// their Sector field) and to the Displacement Scanner's Up/Down tables (one
+// shared filter drives both, since they're two views of the same underlying
+// weekly stock universe -- the Sector Conviction table is already sector-
+// level and is deliberately left unfiltered).
 let themeSectorFilter = "__all__";
 let dispSectorFilter = "__all__";
 
+// Which sub-sectors currently have their top-stocks drill-down open.
+// Kept as state OUTSIDE the render function so it survives sort re-renders
+// (every sort click rebuilds the table's innerHTML from scratch — without
+// this, expanding a row and then sorting a column would silently collapse it).
 let rrgExpanded = new Set();
-let chartReturnPanelId = null;
 
 function fmt(n, d=2){
   if(n === null || n === undefined || isNaN(n)) return "—";
@@ -735,54 +759,34 @@ function cleanTicker(t){
   return (t || "").replace(".NS","").replace(".BO","");
 }
 
-// Tab switcher setup
-document.querySelectorAll(".tab-btn").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
-    document.getElementById("tickerChartView").style.display = "none";
-    
-    btn.classList.add("active");
-    const panelId = "panel-" + btn.dataset.tab;
-    const targetPanel = document.getElementById(panelId);
-    if(targetPanel) targetPanel.classList.add("active");
-  });
-});
-
 async function loadData(){
   try{
     const res = await fetch(DATA_URL, {cache: "no-store"});
     if(!res.ok) throw new Error("HTTP " + res.status);
     const json = await res.json();
     renderStatus(json);
-    
     focusData = json.top_ideas || [];
-    grindData = json.grind_to_breakout || [];
     convData = json.subsector_conviction || [];
-    
     const disp = json.displacement || {};
     dispUpData = disp.top_up || [];
     dispDnData = disp.top_down || [];
     dispSectorData = disp.sector_conviction || [];
-    
     const theme = json.theme_conviction || {};
     themeData = theme.themes || [];
-    
     const rrg = json.sector_rrg || {};
     rrgData = rrg.sub_sectors || [];
-    
+    const grind = json.grind_to_breakout || {};
+    grindData = grind.ideas || [];
+    grindAsOfDate = grind.as_of_date || null;
     populateFocusSectorFilter();
-    populateGrindSectorFilter();
     populateDispSectorFilter();
     populateThemeSectorFilter();
-    
     sortAndRenderFocus();
-    sortAndRenderGrind();
     sortAndRenderConv();
     sortAndRenderDisp();
     sortAndRenderTheme();
     sortAndRenderRRG();
-    
+    sortAndRenderGrind();
     renderRRGChart(rrg.chart_series || [], rrg.rebase_date, rrg.as_of_week);
   }catch(err){
     document.getElementById("statusDot").className = "dot err";
@@ -797,7 +801,8 @@ function renderStatus(json){
   dot.className = "dot " + statusClass;
   text.innerHTML = `${json.run_date_display || json.run_date} <span class="status-sep">·</span> `
     + `<span class="muted">universe</span> ${json.universe_size} `
-    + `<span class="status-sep">·</span> <span class="muted">ideas</span> ${json.combined_count}`;
+    + `<span class="status-sep">·</span> <span class="muted">ideas</span> ${json.combined_count}`
+    + (json.status !== "ok" ? ` <span class="status-sep">·</span> ${json.status.toUpperCase()}` : "");
 
   const wbox = document.getElementById("warningsBox");
   if(json.warnings && json.warnings.length){
@@ -807,98 +812,175 @@ function renderStatus(json){
   }
 }
 
+function renderAskButtons(){
+  const container = document.getElementById("askButtons");
+
+  // Whenever the button list is rebuilt (initial load OR a post-Update
+  // refresh), any previously-shown answer is now stale -- qaData may have
+  // reordered or changed entirely, and innerHTML replacement below drops
+  // the old .active state anyway. Hide it and make the person re-select
+  // rather than risk showing an answer that no longer matches its button.
+  const box = document.getElementById("askAnswerBox");
+  box.style.display = "none";
+  box.textContent = "";
+
+  if(!qaData.length){
+    container.innerHTML = '<div class="empty-state">Q&amp;A data not available right now.</div>';
+    return;
+  }
+  container.innerHTML = qaData.map((qa, i) => `
+    <button class="ask-btn" data-qa-index="${i}">${qa.question}</button>
+  `).join("");
+}
+
+document.getElementById("askButtons").addEventListener("click", (e)=>{
+  const btn = e.target.closest(".ask-btn");
+  if(!btn) return;
+  document.querySelectorAll(".ask-btn").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  const qa = qaData[Number(btn.dataset.qaIndex)];
+  const box = document.getElementById("askAnswerBox");
+  box.style.display = "block";
+  box.textContent = qa.answer;
+});
+
+async function loadQA(){
+  try{
+    const res = await fetch(QA_URL, {cache: "no-store"});
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const json = await res.json();
+    qaData = json.qa || [];
+    renderAskButtons();
+  }catch(err){
+    document.getElementById("askButtons").innerHTML =
+      `<div class="empty-state">Could not load Q&amp;A data — ${err.message}</div>`;
+  }
+}
+
+// Loaded independently of loadData()/loadQA() -- a failure here should never
+// block the main list from working. Clicking a ticker just falls back to an
+// empty-state message if this hasn't loaded (see renderTickerChart()).
+async function loadPriceSeries(){
+  try{
+    const res = await fetch(PRICE_SERIES_URL, {cache: "no-store"});
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const json = await res.json();
+    priceSeriesData = json.series || {};
+  }catch(err){
+    priceSeriesData = {};
+  }
+}
+
 function sortRows(rows, sortState){
   const {key, dir} = sortState;
   return [...rows].sort((a,b)=>{
     const av = a[key], bv = b[key];
     if(typeof av === "string") return av.localeCompare(bv) * dir;
+    if(typeof av === "boolean") return ((av === bv) ? 0 : (av ? 1 : -1)) * dir;
     const an = (av === null || av === undefined || isNaN(av)) ? -Infinity : av;
     const bn = (bv === null || bv === undefined || isNaN(bv)) ? -Infinity : bv;
     return (an - bn) * dir;
   });
 }
 
-// Universal click router for loading Ticker Charts
-function setupUniversalChartTriggers(){
-  // Catch table rows or cards with data-ticker properties dynamically
-  document.body.addEventListener("click", (e) => {
-    const rowOrCard = e.target.closest("[data-ticker]");
-    if (rowOrCard) {
-      const ticker = rowOrCard.getAttribute("data-ticker");
-      if (ticker) openTickerChart(ticker);
-      return;
-    }
-    
-    // Catch isolated inline ticker links (like theme column Lead stock)
-    const linkEl = e.target.closest(".ticker-link");
-    if (linkEl && linkEl.textContent) {
-      const parsedText = linkEl.textContent.trim().split(" ")[0]; 
-      if (parsedText) openTickerChart(parsedText);
-    }
-  });
-}
-
+// ---- Sector drill-down (Focus Screen) ----
+// Populates the <select> with every sector present in today's ideas, each
+// annotated with its count, e.g. "Healthcare & Pharma (5)". Re-run on every
+// data load since the sector list changes day to day.
 function populateFocusSectorFilter(){
   const sel = document.getElementById("focusSectorFilter");
   const counts = {};
   focusData.forEach(r => { counts[r.Sector] = (counts[r.Sector] || 0) + 1; });
   const sectors = Object.keys(counts).sort();
-  sel.innerHTML = `<option value="__all__">All Sectors (${focusData.length})</option>` + sectors.map(s => `<option value="${s}">${s} (${counts[s]})</option>`).join("");
+
+  // If the previously-selected sector no longer appears in today's data
+  // (e.g. it had zero qualifying ideas today), fall back to "All Sectors"
+  // rather than silently showing an empty table under a stale label.
+  if(focusSectorFilter !== "__all__" && !sectors.includes(focusSectorFilter)){
+    focusSectorFilter = "__all__";
+  }
+
+  sel.innerHTML = `<option value="__all__">All Sectors (${focusData.length})</option>`
+    + sectors.map(s => `<option value="${s}">${s} (${counts[s]})</option>`).join("");
   sel.value = focusSectorFilter;
 }
+
 document.getElementById("focusSectorFilter").addEventListener("change", (e)=>{
   focusSectorFilter = e.target.value;
   sortAndRenderFocus();
 });
 
-function populateGrindSectorFilter(){
-  const sel = document.getElementById("grindSectorFilter");
-  const counts = {};
-  grindData.forEach(r => { counts[r.Sector] = (counts[r.Sector] || 0) + 1; });
-  const sectors = Object.keys(counts).sort();
-  sel.innerHTML = `<option value="__all__">All Sectors (${grindData.length})</option>` + sectors.map(s => `<option value="${s}">${s} (${counts[s]})</option>`).join("");
-  sel.value = grindSectorFilter;
-}
-document.getElementById("grindSectorFilter").addEventListener("change", (e)=>{
-  grindSectorFilter = e.target.value;
-  sortAndRenderGrind();
-});
-
-function populateDispSectorFilter(){
-  const sel = document.getElementById("dispSectorFilter");
-  const counts = {};
-  [...dispUpData, ...dispDnData].forEach(r => { counts[r.Sector] = (counts[r.Sector] || 0) + 1; });
-  const sectors = Object.keys(counts).sort();
-  sel.innerHTML = `<option value="__all__">All Sectors (${dispUpData.length + dispDnData.length})</option>` + sectors.map(s => `<option value="${s}">${s} (${counts[s]})</option>`).join("");
-  sel.value = dispSectorFilter;
-}
-document.getElementById("dispSectorFilter").addEventListener("change", (e)=>{
-  dispSectorFilter = e.target.value;
-  sortAndRenderDisp();
-});
-
+// ---- Sector drill-down (Theme Conviction) ----
 function populateThemeSectorFilter(){
   const sel = document.getElementById("themeSectorFilter");
   const counts = {};
-  themeData.forEach(r => { counts[r.Sector || "Other"] = (counts[r.Sector || "Other"] || 0) + 1; });
+  themeData.forEach(r => {
+    const sector = getSectorForSubSector(r.Sub_Sector) || "Other";
+    counts[sector] = (counts[sector] || 0) + 1;
+  });
   const sectors = Object.keys(counts).sort();
-  sel.innerHTML = `<option value="__all__">All Sectors (${themeData.length})</option>` + sectors.map(s => `<option value="${s}">${s} (${counts[s]})</option>`).join("");
+
+  if(themeSectorFilter !== "__all__" && !sectors.includes(themeSectorFilter)){
+    themeSectorFilter = "__all__";
+  }
+
+  sel.innerHTML = `<option value="__all__">All Sectors (${themeData.length})</option>`
+    + sectors.map(s => `<option value="${s}">${s} (${counts[s]})</option>`).join("");
   sel.value = themeSectorFilter;
 }
+
 document.getElementById("themeSectorFilter").addEventListener("change", (e)=>{
   themeSectorFilter = e.target.value;
   sortAndRenderTheme();
 });
 
+// ---- Sector drill-down (Displacement Scanner: Up + Down tables) ----
+// Sector options are the union of whatever appears in either table, each
+// annotated with its combined count across both -- e.g. a sector with 3
+// up-displacements and 1 down-displacement shows as "(4)".
+function populateDispSectorFilter(){
+  const sel = document.getElementById("dispSectorFilter");
+  const counts = {};
+  [...dispUpData, ...dispDnData].forEach(r => { counts[r.Sector] = (counts[r.Sector] || 0) + 1; });
+  const sectors = Object.keys(counts).sort();
+
+  if(dispSectorFilter !== "__all__" && !sectors.includes(dispSectorFilter)){
+    dispSectorFilter = "__all__";
+  }
+
+  sel.innerHTML = `<option value="__all__">All Sectors (${dispUpData.length + dispDnData.length})</option>`
+    + sectors.map(s => `<option value="${s}">${s} (${counts[s]})</option>`).join("");
+  sel.value = dispSectorFilter;
+}
+
+document.getElementById("dispSectorFilter").addEventListener("change", (e)=>{
+  dispSectorFilter = e.target.value;
+  sortAndRenderDisp();
+});
+
 function sortAndRenderFocus(){
-  const scoped = focusSectorFilter !== "__all__" ? focusData.filter(r => r.Sector === focusSectorFilter) : focusData;
+  const isSectorView = focusSectorFilter !== "__all__";
+  const scoped = isSectorView ? focusData.filter(r => r.Sector === focusSectorFilter) : focusData;
   const sorted = sortRows(scoped, focusSort);
-  const rows = focusSectorFilter !== "__all__" ? sorted.slice(0, SECTOR_DRILLDOWN_LIMIT) : sorted;
-  
+  const rows = isSectorView ? sorted.slice(0, SECTOR_DRILLDOWN_LIMIT) : sorted;
+
   const caption = document.getElementById("focusSectorCaption");
-  caption.textContent = focusSectorFilter !== "__all__" ? `Showing top ${Math.min(SECTOR_DRILLDOWN_LIMIT, scoped.length)} of ${scoped.length}` : "";
-  
-  document.getElementById("focusBody").innerHTML = rows.map(r => `
+  caption.textContent = isSectorView
+    ? `Showing top ${Math.min(SECTOR_DRILLDOWN_LIMIT, scoped.length)} of ${scoped.length}, sorted by ${focusSort.key}`
+    : "";
+
+  const body = document.getElementById("focusBody");
+  const cards = document.getElementById("focusCards");
+
+  if(!rows.length){
+    body.innerHTML = "";
+    cards.innerHTML = isSectorView
+      ? `<div class="empty-state">No qualifying ideas in ${focusSectorFilter} today.</div>`
+      : '<div class="empty-state">No qualifying ideas in today\'s run.</div>';
+    return;
+  }
+
+  body.innerHTML = rows.map(r => `
     <tr data-ticker="${r.Ticker}">
       <td class="ticker">${cleanTicker(r.Ticker)}<span class="name-sub">${r.Name || ""}</span></td>
       <td>${r.Sector}<span class="name-sub">${r.Sub_Sector || ""}</span></td>
@@ -913,7 +995,7 @@ function sortAndRenderFocus(){
     </tr>
   `).join("");
 
-  document.getElementById("focusCards").innerHTML = rows.map(r => `
+  cards.innerHTML = rows.map(r => `
     <div class="card" data-ticker="${r.Ticker}">
       <div class="card-top">
         <div>
@@ -930,237 +1012,935 @@ function sortAndRenderFocus(){
         <span>Ratio <b>${fmt(r.Ratio,3)}</b></span>
         <span>Base Days <b>${r.BaseDays}</b></span>
         <span>Trend <b>${fmt(r.TrendQuality,3)}</b></span>
+        <span>Absorption <b>${fmt(r.Absorption,3)}</b></span>
+        <span>Follow-Thru <b>${fmt(r.FollowThrough,3)}</b></span>
       </div>
     </div>
   `).join("");
 }
 
-function sortAndRenderGrind(){
-  const scoped = grindSectorFilter !== "__all__" ? grindData.filter(r => r.Sector === grindSectorFilter) : grindData;
-  const sorted = sortRows(scoped, grindSort);
-  
-  document.getElementById("grindBody").innerHTML = sorted.map(r => `
-    <tr data-ticker="${r.Ticker}">
-      <td class="ticker">${cleanTicker(r.Ticker)}<span class="name-sub">${r.Name || ""}</span></td>
-      <td>${r.Sector}<span class="name-sub">${r.Sub_Sector || ""}</span></td>
-      <td class="num">₹${fmt(r.Price)}</td>
-      <td class="num">${fmt(r.Ratio, 3)}</td>
-      <td class="num">${r.BaseDays}</td>
-      <td class="num">${fmt(r.TrendQuality, 3)}</td>
-      <td class="num">${fmt(r.Absorption, 3)}</td>
-      <td class="num">${fmt(r.FollowThrough, 3)}</td>
-      <td class="num score-cell">${fmt(r.PM_Score, 3)}</td>
-    </tr>
-  `).join("");
+// ---- Ticker chart detail view (shared across tabs) ----
+// Any tab can call openTickerChart(ticker): it hides whichever panel is
+// currently active, shows the shared #tickerChartView, and renders a
+// single static Close/EMA12/EMA26 line chart from priceSeriesData --
+// whatever point count the backend resolved (270 or 180 trading days)
+// for that ticker. "Back" always restores the panel that opened it, so
+// Focus Screen -> back to list, Displacement -> back to Up/Down tables,
+// etc., without any tab-specific chart-view code.
 
-  document.getElementById("grindCards").innerHTML = sorted.map(r => `
-    <div class="card" data-ticker="${r.Ticker}">
-      <div class="card-top">
-        <div>
-          <div class="card-ticker">${cleanTicker(r.Ticker)}</div>
-          <div class="card-name">${r.Name || ""}</div>
-        </div>
-        <div>
-          <div class="card-score">${fmt(r.PM_Score,3)}</div>
-          <div class="card-score-label">PM Score</div>
-        </div>
-      </div>
-      <div class="card-meta">
-        <span>Price <b>₹${fmt(r.Price)}</b></span>
-        <span>Ratio <b>${fmt(r.Ratio,3)}</b></span>
-        <span>Base Days <b>${r.BaseDays}</b></span>
-      </div>
-    </div>
-  `).join("");
-}
+let chartReturnPanelId = null;
 
-function sortAndRenderConv(){
-  const sorted = sortRows(convData, convSort);
-  document.getElementById("convBody").innerHTML = sorted.map(r => `
-    <tr>
-      <td><b>${r.Sub_Sector}</b></td>
-      <td>${r.sector}</td>
-      <td class="num">${r.n_accumulating} / ${r.n_total}</td>
-      <td class="num">${fmt(r.breadth_pct * 100, 1)}%</td>
-      <td class="num">${fmt(r.avg_basedays, 0)}</td>
-      <td class="num">${fmt(r.avg_followthru, 2)}</td>
-      <td class="num score-cell">${fmt(r.conviction, 2)}</td>
-      <td class="ticker-link">${cleanTicker(r.top_stock)}</td>
-    </tr>
-  `).join("");
-}
-
-function sortAndRenderDisp(){
-  const scopedUp = dispSectorFilter !== "__all__" ? dispUpData.filter(r => r.Sector === dispSectorFilter) : dispUpData;
-  const sortedUp = sortRows(scopedUp, dispUpSort);
-  
-  document.getElementById("dispUpBody").innerHTML = sortedUp.map(r => `
-    <tr data-ticker="${r.Ticker}">
-      <td class="ticker">${cleanTicker(r.Ticker)}</td>
-      <td>${r.Sector}</td>
-      <td class="num">₹${fmt(r.Price)}</td>
-      <td class="num">${fmt(r.Displacement_Z, 2)}</td>
-      <td class="num">${fmt(r.Volume_Z, 2)}</td>
-      <td>${r.Structural_Level || "—"}</td>
-      <td class="num score-cell">${fmt(r.Score, 2)}</td>
-      <td class="num">${r.Decile || "—"}</td>
-    </tr>
-  `).join("");
-
-  const scopedDn = dispSectorFilter !== "__all__" ? dispDnData.filter(r => r.Sector === dispSectorFilter) : dispDnData;
-  const sortedDn = sortRows(scopedDn, dispDnSort);
-  
-  document.getElementById("dispDnBody").innerHTML = sortedDn.map(r => `
-    <tr data-ticker="${r.Ticker}">
-      <td class="ticker">${cleanTicker(r.Ticker)}</td>
-      <td>${r.Sector}</td>
-      <td class="num">₹${fmt(r.Price)}</td>
-      <td class="num">${fmt(r.Displacement_Z, 2)}</td>
-      <td class="num">${fmt(r.Volume_Z, 2)}</td>
-      <td>${r.Structural_Level || "—"}</td>
-      <td class="num score-cell">${fmt(r.Score, 2)}</td>
-      <td class="num">${r.Decile || "—"}</td>
-    </tr>
-  `).join("");
-
-  const sortedSector = sortRows(dispSectorData, dispSectorSort);
-  document.getElementById("dispSectorBody").innerHTML = sortedSector.map(r => `
-    <tr>
-      <td><b>${r.Sector}</b></td>
-      <td class="num">${r.Stocks}</td>
-      <td class="num">${fmt(r.Bull_Exp_Pct * 100, 0)}%</td>
-      <td class="num">${fmt(r.Bear_Exp_Pct * 100, 0)}%</td>
-      <td class="num">${fmt(r.Density_Z, 2)}</td>
-      <td class="num score-cell">${fmt(r.Conviction, 2)}</td>
-      <td class="ticker-link">${cleanTicker(r.Top_Horse)}</td>
-    </tr>
-  `).join("");
-}
-
-function sortAndRenderTheme(){
-  const scoped = themeSectorFilter !== "__all__" ? themeData.filter(r => r.Sector === themeSectorFilter) : themeData;
-  const sorted = sortRows(scoped, themeSort);
-  
-  document.getElementById("themeBody").innerHTML = sorted.map(r => `
-    <tr>
-      <td><b>${r.Sub_Sector}</b></td>
-      <td class="num">${r.Stocks}</td>
-      <td class="num">${fmt(r.Momentum, 2)}</td>
-      <td class="num">${fmt(r.Persistence, 2)}</td>
-      <td class="num">${fmt(r.Expansion, 2)}</td>
-      <td class="num">${fmt(r.DQ, 2)}</td>
-      <td class="num score-cell">${fmt(r.Conviction, 2)}</td>
-      <td>${r.Driver || "—"}</td>
-      <td class="ticker-link">${cleanTicker(r.Lead_Stock)}</td>
-    </tr>
-  `).join("");
-}
-
-function sortAndRenderRRG(){
-  const sorted = sortRows(rrgData, rrgSort);
-  document.getElementById("rrgBody").innerHTML = sorted.map(r => `
-    <tr class="rrg-row" data-subsector="${r.Sub_Sector}">
-      <td><b>${r.Sub_Sector}</b></td>
-      <td>${r.Sector}</td>
-      <td class="num">${r.Constituents ? r.Constituents.length : 0}</td>
-      <td class="num">${fmt(r.rs_ratio, 2)}</td>
-      <td class="num">${fmt(r.mom_4w_pct * 100, 1)}%</td>
-      <td>${r.struct_rank_display || "—"}</td>
-      <td class="num score-cell">${fmt(r.Combined_Score, 2)}</td>
-    </tr>
-  `).join("");
-}
-
+// Looks across every dataset currently loaded for a Name/Sector to show
+// under the ticker in the chart header. Focus Screen rows carry a Name;
+// Displacement/RRG/Conviction rows don't, so those charts show just the
+// sector (or sub-sector, where that's the only field available -- see
+// the Theme and Sub-Sector Conviction branches below).
 function findTickerMeta(ticker){
   const inFocus = focusData.find(r => r.Ticker === ticker);
   if(inFocus) return { name: inFocus.Name, sector: inFocus.Sector };
-  const inGrind = grindData.find(r => r.Ticker === ticker);
-  if(inGrind) return { name: inGrind.Name, sector: inGrind.Sector };
   const inUp = dispUpData.find(r => r.Ticker === ticker);
   if(inUp) return { name: null, sector: inUp.Sector };
   const inDn = dispDnData.find(r => r.Ticker === ticker);
   if(inDn) return { name: null, sector: inDn.Sector };
+  const inDispSector = dispSectorData.find(r => r.Top_Horse === ticker);
+  if(inDispSector) return { name: null, sector: inDispSector.Sector };
+  for(const sub of rrgData){
+    if((sub.Top_Stocks || []).some(s => s.Ticker === ticker)) return { name: null, sector: sub.Sector };
+  }
+  const inConv = convData.find(r => r.top_stock === ticker);
+  // Sub-Sector Conviction rows use lowercase `sector` (see sortAndRenderConv) --
+  // deliberately matching the field name as-is rather than normalizing it here.
+  if(inConv) return { name: null, sector: inConv.sector };
+  const inGrind = grindData.find(r => r.ID === ticker);
+  if(inGrind) return { name: null, sector: inGrind.Sector };
+  const inTheme = themeData.find(t => t.Lead_Stock === ticker);
+  // Theme rows don't carry a Sector field at all (only Sub_Sector -- see
+  // getSectorForSubSector() for why), so fall back to the sub-sector name
+  // itself rather than showing a blank subtitle.
+  if(inTheme) return { name: null, sector: inTheme.Sub_Sector };
   return { name: null, sector: null };
 }
 
-function openTickerChart(ticker){
-  const panels = document.querySelectorAll(".panel");
-  panels.forEach(p => {
-    if(p.classList.contains("active")) chartReturnPanelId = p.id;
-    p.classList.remove("active");
-  });
-  
-  document.getElementById("tickerChartView").style.display = "block";
-  currentChartTicker = ticker;
-  
-  const meta = findTickerMeta(ticker);
-  document.getElementById("chartTickerName").textContent = cleanTicker(ticker);
-  document.getElementById("chartTickerSub").textContent = (meta.name ? meta.name + " · " : "") + (meta.sector || "India Equities Universe");
-  
-  renderTickerChart(ticker);
+// BUG FIX (found while wiring the Theme chart click-through): theme
+// entries from theme_conviction.themes carry Sub_Sector but never a
+// Sector field -- confirmed against the actual API payload, not assumed.
+// The Theme sector-filter dropdown (populateThemeSectorFilter, below)
+// was built earlier assuming r.Sector existed on theme rows; it silently
+// didn't, so the dropdown was populating a bogus "undefined (N)" option
+// and the filter matched nothing for any real sector name. This derives
+// Sector by looking up the same Sub_Sector name in RRG data first (it
+// has the widest sub-sector coverage of any dataset we load), falling
+// back to Focus Screen / Displacement data, both of which also carry
+// both fields on every row.
+function getSectorForSubSector(subSector){
+  const inRRG = rrgData.find(r => r.Sub_Sector === subSector);
+  if(inRRG) return inRRG.Sector;
+  const inFocus = focusData.find(r => r.Sub_Sector === subSector);
+  if(inFocus) return inFocus.Sector;
+  const inUp = dispUpData.find(r => r.Sub_Sector === subSector);
+  if(inUp) return inUp.Sector;
+  const inDn = dispDnData.find(r => r.Sub_Sector === subSector);
+  if(inDn) return inDn.Sector;
+  return null;
 }
 
-document.getElementById("tickerChartBack").addEventListener("click", () => {
-  document.getElementById("tickerChartView").style.display = "none";
-  if(chartReturnPanelId) {
-    document.getElementById(chartReturnPanelId).classList.add("active");
-  } else {
-    document.getElementById("panel-focus").classList.add("active");
-  }
-});
+function openTickerChart(ticker){
+  currentChartTicker = ticker;
 
-function renderTickerChart(ticker){
-  const ctx = document.getElementById("tickerChart").getContext("2d");
-  if(tickerChartInstance) tickerChartInstance.destroy();
-  
-  const series = priceSeriesData[ticker];
+  const activePanel = document.querySelector(".panel.active");
+  chartReturnPanelId = activePanel ? activePanel.id : "panel-focus";
+  if(activePanel) activePanel.classList.remove("active");
+
+  document.getElementById("tickerChartView").style.display = "block";
+
+  const meta = findTickerMeta(ticker);
+  document.getElementById("chartTickerName").textContent = cleanTicker(ticker);
+  document.getElementById("chartTickerSub").textContent = [meta.name, meta.sector].filter(Boolean).join(" · ");
+
+  renderTickerChart();
+}
+
+function closeTickerChart(){
+  document.getElementById("tickerChartView").style.display = "none";
+  const returnPanel = document.getElementById(chartReturnPanelId || "panel-focus");
+  if(returnPanel) returnPanel.classList.add("active");
+  if(tickerChartInstance){
+    tickerChartInstance.destroy();
+    tickerChartInstance = null;
+  }
+  currentChartTicker = null;
+}
+
+function renderTickerChart(){
+  const wrap = document.querySelector("#tickerChartView .chart-wrap");
+  const note = document.getElementById("chartLegendNote");
+  const series = priceSeriesData[currentChartTicker];
+
   if(!series || !series.dates || !series.dates.length){
-    document.getElementById("chartLegendNote").textContent = "No detailed price historical tracking series available for " + cleanTicker(ticker);
+    wrap.innerHTML = `<div class="empty-state">No chart data yet for ${cleanTicker(currentChartTicker)} — new entrants get chart data starting with the next daily run.</div>`;
+    note.textContent = "";
     return;
   }
-  
-  document.getElementById("chartLegendNote").textContent = `Plotting trailing ${series.dates.length} periods. Close price vs system short/long baselines.`;
-  
-  tickerChartInstance = new Chart(ctx, {
-    type: 'line',
+
+  // A previous ticker with no data may have replaced the canvas with an
+  // empty-state div above -- restore it before drawing.
+  if(!document.getElementById("tickerChart")){
+    wrap.innerHTML = '<canvas id="tickerChart"></canvas>';
+  }
+
+  if(tickerChartInstance) tickerChartInstance.destroy();
+  tickerChartInstance = new Chart(document.getElementById("tickerChart").getContext("2d"), {
+    type: "line",
     data: {
       labels: series.dates,
       datasets: [
-        { label: 'Close', data: series.close, borderColor: '#14171A', borderWidth: 1.7, pointRadius: 0 },
-        { label: 'EMA12', data: series.ema12, borderColor: '#C1592B', borderWidth: 1.2, pointRadius: 0, borderDash: [4, 4] },
-        { label: 'EMA26', data: series.ema26, borderColor: '#2B6E63', borderWidth: 1.2, pointRadius: 0, borderDash: [2, 2] }
+        { label: "Close", data: series.close, borderColor: "#14171A", backgroundColor: "#14171A", borderWidth: 2, pointRadius: 0, tension: 0.1 },
+        { label: "EMA 12", data: series.ema12, borderColor: "#2B6E63", backgroundColor: "#2B6E63", borderWidth: 1.5, pointRadius: 0, tension: 0.1 },
+        { label: "EMA 26", data: series.ema26, borderColor: "#5B4B8A", backgroundColor: "#5B4B8A", borderWidth: 1.5, pointRadius: 0, tension: 0.1 },
       ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ₹${ctx.parsed.y.toFixed(2)}` } }
+      },
       scales: {
-        x: { grid: { display: false } },
-        y: { grid: { color: '#E2E5E1' } }
+        x: { ticks: { maxTicksLimit: 7, font: { size: 10 } } },
+        y: { ticks: { font: { size: 10 } } }
       }
     }
   });
+
+  note.textContent = `${series.dates.length} trading days shown · ${series.dates[0]} to ${series.dates[series.dates.length - 1]}`;
 }
 
-function renderRRGChart(series, rebaseDate, asOfWeek) {
-  // Keeping template structure intact
-}
+// Delegated click handlers -- one pair per clickable table/card container.
+// Each just needs data-ticker on its rows/cards (added in the relevant
+// render function) and calls the same shared openTickerChart().
+document.getElementById("focusBody").addEventListener("click", (e)=>{
+  const row = e.target.closest("tr[data-ticker]");
+  if(!row) return;
+  openTickerChart(row.dataset.ticker);
+});
 
-// Added missing function to prevent crash
-async function loadPriceSeries(){
-  try {
-    const res = await fetch(PRICE_SERIES_URL, {cache: "no-store"});
-    if(res.ok) {
-      priceSeriesData = await res.json();
-    }
-  } catch(e) {
-    console.error("Could not load price series data:", e);
+document.getElementById("focusCards").addEventListener("click", (e)=>{
+  const card = e.target.closest(".card[data-ticker]");
+  if(!card) return;
+  openTickerChart(card.dataset.ticker);
+});
+
+document.getElementById("dispUpBody").addEventListener("click", (e)=>{
+  const row = e.target.closest("tr[data-ticker]");
+  if(!row) return;
+  openTickerChart(row.dataset.ticker);
+});
+document.getElementById("dispUpCards").addEventListener("click", (e)=>{
+  const card = e.target.closest(".card[data-ticker]");
+  if(!card) return;
+  openTickerChart(card.dataset.ticker);
+});
+
+document.getElementById("dispDnBody").addEventListener("click", (e)=>{
+  const row = e.target.closest("tr[data-ticker]");
+  if(!row) return;
+  openTickerChart(row.dataset.ticker);
+});
+document.getElementById("dispDnCards").addEventListener("click", (e)=>{
+  const card = e.target.closest(".card[data-ticker]");
+  if(!card) return;
+  openTickerChart(card.dataset.ticker);
+});
+
+document.getElementById("tickerChartBack").addEventListener("click", closeTickerChart);
+
+// Single global handler for the .ticker-link pattern (single-cell-clickable
+// ticker references inside an otherwise non-stock row: Theme Conviction's
+// Lead_Stock, Sub-Sector Conviction's top_stock, Displacement's own Sector
+// Conviction Top_Horse). Registered once on `document` rather than per
+// container -- every current and future .ticker-link is covered
+// automatically, with no new listener needed when another tab gets one.
+document.addEventListener("click", (e)=>{
+  const link = e.target.closest(".ticker-link[data-ticker]");
+  if(!link) return;
+  openTickerChart(link.dataset.ticker);
+});
+
+function sortAndRenderConv(){
+  const rows = sortRows(convData, convSort);
+  const body = document.getElementById("convBody");
+  const cards = document.getElementById("convCards");
+
+  if(!rows.length){
+    body.innerHTML = "";
+    cards.innerHTML = '<div class="empty-state">No sub-sector data in today\'s run.</div>';
+    return;
   }
+
+  body.innerHTML = rows.map(r => `
+    <tr>
+      <td class="ticker">${r.Sub_Sector}</td>
+      <td>${r.sector}</td>
+      <td class="num">${r.n_accumulating}/${r.n_total}</td>
+      <td class="num">${fmt(r.breadth_pct,1)}%</td>
+      <td class="num">${fmt(r.avg_basedays,0)}</td>
+      <td class="num">${fmt(r.avg_followthru,3)}</td>
+      <td class="num score-cell">${fmt(r.conviction,1)}</td>
+      <td><span class="ticker-link" data-ticker="${r.top_stock}">${cleanTicker(r.top_stock)}</span></td>
+    </tr>
+  `).join("");
+
+  cards.innerHTML = rows.map(r => `
+    <div class="card">
+      <div class="card-top">
+        <div>
+          <div class="card-ticker">${r.Sub_Sector}</div>
+          <div class="card-name">${r.sector} · top: <span class="ticker-link" data-ticker="${r.top_stock}">${cleanTicker(r.top_stock)}</span></div>
+        </div>
+        <div>
+          <div class="card-score">${fmt(r.conviction,1)}</div>
+          <div class="card-score-label">Conviction</div>
+        </div>
+      </div>
+      <div class="conv-bar-track"><div class="conv-bar-fill" style="width:${Math.min(r.conviction,100)}%"></div></div>
+      <div class="card-meta" style="margin-top:8px;">
+        <span>Accumulating <b>${r.n_accumulating}/${r.n_total}</b></span>
+        <span>Breadth <b>${fmt(r.breadth_pct,1)}%</b></span>
+        <span>Avg Base Days <b>${fmt(r.avg_basedays,0)}</b></span>
+        <span>Avg Follow-Thru <b>${fmt(r.avg_followthru,3)}</b></span>
+      </div>
+    </div>
+  `).join("");
 }
 
-// Initial setup hooks
-setupUniversalChartTriggers();
+function renderDispTable(rows, bodyId, cardsId, kind){
+  const body = document.getElementById(bodyId);
+  const cards = document.getElementById(cardsId);
+
+  if(!rows.length){
+    body.innerHTML = "";
+    cards.innerHTML = `<div class="empty-state">No ${kind} data in today's run.</div>`;
+    return;
+  }
+
+  if(kind === "sector conviction"){
+    body.innerHTML = rows.map(r => `
+      <tr>
+        <td class="ticker">${r.Sector}</td>
+        <td class="num">${r.Stocks}</td>
+        <td class="num">${fmt(r.Bull_Exp_Pct,1)}%</td>
+        <td class="num">${fmt(r.Bear_Exp_Pct,1)}%</td>
+        <td class="num">${fmt(r.Density_Z,2)}</td>
+        <td class="num score-cell">${fmt(r.Conviction,1)}</td>
+        <td><span class="ticker-link" data-ticker="${r.Top_Horse}">${cleanTicker(r.Top_Horse)}</span></td>
+      </tr>
+    `).join("");
+    cards.innerHTML = rows.map(r => `
+      <div class="card">
+        <div class="card-top">
+          <div>
+            <div class="card-ticker">${r.Sector}</div>
+            <div class="card-name">top: <span class="ticker-link" data-ticker="${r.Top_Horse}">${cleanTicker(r.Top_Horse)}</span></div>
+          </div>
+          <div>
+            <div class="card-score">${fmt(r.Conviction,1)}</div>
+            <div class="card-score-label">Conviction</div>
+          </div>
+        </div>
+        <div class="card-meta">
+          <span>Bull <b>${fmt(r.Bull_Exp_Pct,1)}%</b></span>
+          <span>Bear <b>${fmt(r.Bear_Exp_Pct,1)}%</b></span>
+          <span>Density Z <b>${fmt(r.Density_Z,2)}</b></span>
+        </div>
+      </div>
+    `).join("");
+    return;
+  }
+
+  body.innerHTML = rows.map(r => `
+    <tr data-ticker="${r.Ticker}">
+      <td class="ticker">${cleanTicker(r.Ticker)}</td>
+      <td>${r.Sector}<span class="name-sub">${r.Sub_Sector || ""}</span></td>
+      <td class="num">₹${fmt(r.Price)}</td>
+      <td class="num">${fmt(r.Displacement_Z,2)}</td>
+      <td class="num">${fmt(r.Volume_Z,2)}</td>
+      <td>${r.Structural_Level !== "None" ? r.Structural_Level : "—"}</td>
+      <td class="num score-cell">${fmt(r.Score,3)}</td>
+      <td class="num">${fmt(r.Decile,3)}</td>
+    </tr>
+  `).join("");
+
+  cards.innerHTML = rows.map(r => `
+    <div class="card" data-ticker="${r.Ticker}">
+      <div class="card-top">
+        <div>
+          <div class="card-ticker">${cleanTicker(r.Ticker)}</div>
+          <div class="card-name">${r.Sector}${r.Structural_Level !== "None" ? " · " + r.Structural_Level : ""}</div>
+        </div>
+        <div>
+          <div class="card-score">${fmt(r.Score,3)}</div>
+          <div class="card-score-label">Score</div>
+        </div>
+      </div>
+      <div class="card-meta">
+        <span>Price <b>₹${fmt(r.Price)}</b></span>
+        <span>Disp Z <b>${fmt(r.Displacement_Z,2)}</b></span>
+        <span>Vol Z <b>${fmt(r.Volume_Z,2)}</b></span>
+        <span>Decile <b>${fmt(r.Decile,3)}</b></span>
+      </div>
+    </div>
+  `).join("");
+}
+
+function sortAndRenderDisp(){
+  const isSectorView = dispSectorFilter !== "__all__";
+
+  const scopedUp = isSectorView ? dispUpData.filter(r => r.Sector === dispSectorFilter) : dispUpData;
+  const sortedUp = sortRows(scopedUp, dispUpSort);
+  const rowsUp = isSectorView ? sortedUp.slice(0, SECTOR_DRILLDOWN_LIMIT) : sortedUp;
+
+  const scopedDn = isSectorView ? dispDnData.filter(r => r.Sector === dispSectorFilter) : dispDnData;
+  const sortedDn = sortRows(scopedDn, dispDnSort);
+  const rowsDn = isSectorView ? sortedDn.slice(0, SECTOR_DRILLDOWN_LIMIT) : sortedDn;
+
+  const caption = document.getElementById("dispSectorCaption");
+  caption.textContent = isSectorView
+    ? `Showing top ${Math.min(SECTOR_DRILLDOWN_LIMIT, scopedUp.length)} of ${scopedUp.length} up, top ${Math.min(SECTOR_DRILLDOWN_LIMIT, scopedDn.length)} of ${scopedDn.length} down`
+    : "";
+
+  renderDispTable(rowsUp, "dispUpBody", "dispUpCards", isSectorView ? `up displacement in ${dispSectorFilter}` : "up displacement");
+  renderDispTable(rowsDn, "dispDnBody", "dispDnCards", isSectorView ? `down displacement in ${dispSectorFilter}` : "down displacement");
+  renderDispTable(sortRows(dispSectorData, dispSectorSort), "dispSectorBody", "dispSectorCards", "sector conviction");
+}
+
+function sortAndRenderTheme(){
+  const isSectorView = themeSectorFilter !== "__all__";
+  const scoped = isSectorView ? themeData.filter(r => (getSectorForSubSector(r.Sub_Sector) || "Other") === themeSectorFilter) : themeData;
+  const sorted = sortRows(scoped, themeSort);
+  const rows = isSectorView ? sorted.slice(0, SECTOR_DRILLDOWN_LIMIT) : sorted;
+
+  const caption = document.getElementById("themeSectorCaption");
+  caption.textContent = isSectorView
+    ? `Showing top ${Math.min(SECTOR_DRILLDOWN_LIMIT, scoped.length)} of ${scoped.length}, sorted by ${themeSort.key}`
+    : "";
+
+  const body = document.getElementById("themeBody");
+  const cards = document.getElementById("themeCards");
+
+  if(!rows.length){
+    body.innerHTML = "";
+    cards.innerHTML = isSectorView
+      ? `<div class="empty-state">No themes in ${themeSectorFilter} today.</div>`
+      : '<div class="empty-state">No theme conviction data in today\'s run.</div>';
+    return;
+  }
+
+  body.innerHTML = rows.map(r => `
+    <tr>
+      <td class="ticker">${r.Sub_Sector}</td>
+      <td class="num">${r.Stocks}</td>
+      <td class="num">${fmt(r.Momentum,1)}</td>
+      <td class="num">${fmt(r.Persistence,1)}</td>
+      <td class="num">${fmt(r.Expansion,1)}</td>
+      <td class="num">${fmt(r.DQ,1)}</td>
+      <td class="num score-cell">${fmt(r.Conviction,1)}</td>
+      <td><span class="tag ${r.Driver}">${r.Driver}</span></td>
+      <td><span class="ticker-link" data-ticker="${r.Lead_Stock}">${cleanTicker(r.Lead_Stock)}</span></td>
+    </tr>
+  `).join("");
+
+  cards.innerHTML = rows.map(r => `
+    <div class="card">
+      <div class="card-top">
+        <div>
+          <div class="card-ticker">${r.Sub_Sector}</div>
+          <div class="card-name">${r.Stocks} stocks · <span class="tag ${r.Driver}">${r.Driver}</span> driven · lead: <span class="ticker-link" data-ticker="${r.Lead_Stock}">${cleanTicker(r.Lead_Stock)}</span></div>
+        </div>
+        <div>
+          <div class="card-score">${fmt(r.Conviction,1)}</div>
+          <div class="card-score-label">Conviction</div>
+        </div>
+      </div>
+      <div class="pillar-bars">
+        <div class="pillar-bar" title="Momentum ${fmt(r.Momentum,1)}"><div class="pillar-bar-fill momentum" style="width:${Math.min(r.Momentum,100)}%"></div></div>
+        <div class="pillar-bar" title="Persistence ${fmt(r.Persistence,1)}"><div class="pillar-bar-fill persistence" style="width:${Math.min(r.Persistence,100)}%"></div></div>
+        <div class="pillar-bar" title="Expansion ${fmt(r.Expansion,1)}"><div class="pillar-bar-fill expansion" style="width:${Math.min(r.Expansion,100)}%"></div></div>
+        <div class="pillar-bar" title="DQ ${fmt(r.DQ,1)}"><div class="pillar-bar-fill dq" style="width:${Math.min(r.DQ,100)}%"></div></div>
+      </div>
+      <div class="card-meta" style="margin-top:8px;">
+        <span>Momentum <b>${fmt(r.Momentum,1)}</b></span>
+        <span>Persist <b>${fmt(r.Persistence,1)}</b></span>
+        <span>Expand <b>${fmt(r.Expansion,1)}</b></span>
+        <span>DQ <b>${fmt(r.DQ,1)}</b></span>
+      </div>
+    </div>
+  `).join("");
+}
+
+// .ticker-link click handling is registered once, globally -- see the
+// single document-level listener near the other chart-view wiring below.
+// (Theme's Lead_Stock, Sub-Sector Conviction's top_stock, and
+// Displacement's own Sector Conviction Top_Horse all use this same
+// single-cell-clickable pattern, since each of those rows represents an
+// aggregate -- sub-sector or sector -- not an individual stock.)
+
+function highBadges(r){
+  const b13 = r.is_13w_high ? "active" : "";
+  const b26 = r.is_26w_high ? "active" : "";
+  const b52 = r.is_52w_high ? "active-52" : "";
+  return `<div class="high-badges">
+    <span class="high-badge ${b13}">13w</span>
+    <span class="high-badge ${b26}">26w</span>
+    <span class="high-badge ${b52}">52w</span>
+  </div>`;
+}
+
+function renderRRGStockDetail(subSectorRow){
+  const stocks = subSectorRow.Top_Stocks || [];
+  if(!stocks.length){
+    return `<div class="rrg-empty-detail">No individual stock data available for this sub-sector.</div>`;
+  }
+  const rowsHtml = stocks.map(s => `
+    <tr data-ticker="${s.Ticker}">
+      <td class="ticker">${cleanTicker(s.Ticker)}</td>
+      <td class="num">₹${fmt(s.Price)}</td>
+      <td class="num">${fmt(s.rs_ratio,3)}</td>
+      <td class="num">${s.mom_4w_pct >= 0 ? '+' : ''}${fmt(s.mom_4w_pct,2)}%</td>
+      <td>${highBadges(s)}</td>
+      <td class="num score-cell">${fmt(s.stock_score,1)}</td>
+    </tr>
+  `).join("");
+  return `
+    <div class="rrg-detail-inner">
+      <table class="rrg-stock-table">
+        <thead>
+          <tr>
+            <th>Ticker</th>
+            <th class="num">Price</th>
+            <th class="num">RS Ratio</th>
+            <th class="num">4w Mom %</th>
+            <th>Structural High</th>
+            <th class="num">Score</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function sortAndRenderRRG(){
+  rrgData.forEach(r => {
+    r.struct_rank_display = r.is_52w_high ? 3 : r.is_26w_high ? 2 : r.is_13w_high ? 1 : 0;
+  });
+  const rows = sortRows(rrgData, rrgSort.key === "struct_rank_display"
+    ? { key: "struct_rank_display", dir: rrgSort.dir }
+    : rrgSort);
+  const body = document.getElementById("rrgBody");
+  const cards = document.getElementById("rrgCards");
+
+  if(!rows.length){
+    body.innerHTML = "";
+    cards.innerHTML = '<div class="empty-state">No sector rotation data in today\'s run.</div>';
+    return;
+  }
+
+  body.innerHTML = rows.map(r => {
+    const isOpen = rrgExpanded.has(r.Sub_Sector);
+    const mainRow = `
+      <tr class="rrg-row ${r.Top5 ? 'top5-row' : ''} ${isOpen ? 'expanded' : ''}" data-subsector="${r.Sub_Sector}">
+        <td class="ticker"><span class="expand-icon">▶</span>${r.Sub_Sector}${r.Top5 ? ' <span class="tag Top5Badge">TOP 5</span>' : ''}</td>
+        <td>${r.Sector}</td>
+        <td class="num">${r.Constituents}</td>
+        <td class="num">${fmt(r.rs_ratio,3)}</td>
+        <td class="num">${r.mom_4w_pct >= 0 ? '+' : ''}${fmt(r.mom_4w_pct,2)}%</td>
+        <td>${highBadges(r)}</td>
+        <td class="num score-cell">${fmt(r.Combined_Score,1)}</td>
+      </tr>
+    `;
+    const detailRow = isOpen ? `
+      <tr class="rrg-detail-row">
+        <td colspan="7">${renderRRGStockDetail(r)}</td>
+      </tr>
+    ` : "";
+    return mainRow + detailRow;
+  }).join("");
+
+  cards.innerHTML = rows.map(r => {
+    const stocks = r.Top_Stocks || [];
+    const stocksHtml = stocks.map(s => `
+      <div class="card-stock-row" data-ticker="${s.Ticker}">
+        <span class="cs-ticker">${cleanTicker(s.Ticker)}</span>
+        <span class="cs-meta">₹${fmt(s.Price)} · ${s.mom_4w_pct >= 0 ? '+' : ''}${fmt(s.mom_4w_pct,1)}% · ${fmt(s.stock_score,0)}</span>
+      </div>
+    `).join("");
+    return `
+      <div class="card ${r.Top5 ? 'top5-card' : ''}">
+        <div class="card-top">
+          <div>
+            <div class="card-ticker">${r.Sub_Sector}${r.Top5 ? ' <span class="tag Top5Badge">TOP 5</span>' : ''}</div>
+            <div class="card-name">${r.Sector} · ${r.Constituents} stocks</div>
+          </div>
+          <div>
+            <div class="card-score">${fmt(r.Combined_Score,1)}</div>
+            <div class="card-score-label">Score</div>
+          </div>
+        </div>
+        ${highBadges(r)}
+        <div class="card-meta" style="margin-top:8px;">
+          <span>RS Ratio <b>${fmt(r.rs_ratio,3)}</b></span>
+          <span>4w Mom <b>${r.mom_4w_pct >= 0 ? '+' : ''}${fmt(r.mom_4w_pct,2)}%</b></span>
+        </div>
+        <button class="card-toggle-btn" data-subsector-toggle="${r.Sub_Sector}">Show top stocks</button>
+        <div class="card-top-stocks" data-subsector-list="${r.Sub_Sector}">${stocksHtml}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+// ---- Grind to Breakout ----
+// UNVALIDATED against BQNT (see grind_to_breakout.py header) -- surfaced
+// in the caption rather than silently treated the same as every other
+// (validated) tab.
+function sortAndRenderGrind(){
+  const rows = sortRows(grindData, grindSort);
+  const body = document.getElementById("grindBody");
+  const cards = document.getElementById("grindCards");
+
+  const caption = document.getElementById("grindCaption");
+  caption.textContent = grindAsOfDate
+    ? `As of ${grindAsOfDate} · ${grindData.length} idea${grindData.length === 1 ? "" : "s"} · pattern is unvalidated against BQNT -- treat as a defensible simplification, not a proven match.`
+    : "";
+
+  if(!rows.length){
+    body.innerHTML = "";
+    cards.innerHTML = '<div class="empty-state">No qualifying grind-to-breakout patterns in today\'s run.</div>';
+    return;
+  }
+
+  body.innerHTML = rows.map(r => `
+    <tr data-ticker="${r.ID}">
+      <td class="ticker">${cleanTicker(r.ID)}</td>
+      <td>${r.Sector}<span class="name-sub">${r.Sub_Sector || ""}</span></td>
+      <td class="num">₹${fmt(r.continuation_px)}</td>
+      <td class="num">${r.ext_over_zone_pct >= 0 ? '+' : ''}${fmt(r.ext_over_zone_pct,2)}%</td>
+      <td class="num">${r.grind_days}</td>
+      <td class="num">${fmt(r.dq_score,1)}</td>
+      <td class="num">${fmt(r.grind_quality_score,3)}</td>
+      <td class="num">${fmt(r.thrust_score,3)}</td>
+      <td class="num score-cell">${fmt(r.final_score,3)}</td>
+    </tr>
+  `).join("");
+
+  cards.innerHTML = rows.map(r => `
+    <div class="card" data-ticker="${r.ID}">
+      <div class="card-top">
+        <div>
+          <div class="card-ticker">${cleanTicker(r.ID)}</div>
+          <div class="card-name">${r.Sector} · continuation ${fmt(r.grind_days,0)}d grind</div>
+        </div>
+        <div>
+          <div class="card-score">${fmt(r.final_score,3)}</div>
+          <div class="card-score-label">Final Score</div>
+        </div>
+      </div>
+      <div class="card-meta">
+        <span>Cont. Price <b>₹${fmt(r.continuation_px)}</b></span>
+        <span>Ext over Zone <b>${r.ext_over_zone_pct >= 0 ? '+' : ''}${fmt(r.ext_over_zone_pct,2)}%</b></span>
+        <span>Grind Days <b>${r.grind_days}</b></span>
+        <span>DQ Score <b>${fmt(r.dq_score,1)}</b></span>
+        <span>Grind Quality <b>${fmt(r.grind_quality_score,3)}</b></span>
+        <span>Thrust <b>${fmt(r.thrust_score,3)}</b></span>
+      </div>
+    </div>
+  `).join("");
+}
+
+document.getElementById("grindBody").addEventListener("click", (e)=>{
+  const row = e.target.closest("tr[data-ticker]");
+  if(!row) return;
+  openTickerChart(row.dataset.ticker);
+});
+document.getElementById("grindCards").addEventListener("click", (e)=>{
+  const card = e.target.closest(".card[data-ticker]");
+  if(!card) return;
+  openTickerChart(card.dataset.ticker);
+});
+
+document.querySelectorAll("#grindTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    grindSort.dir = (grindSort.key === key) ? -grindSort.dir : -1;
+    grindSort.key = key;
+    sortAndRenderGrind();
+  });
+});
+
+document.getElementById("rrgBody").addEventListener("click", (e)=>{
+  // Stock-level click (a row inside an expanded sub-sector's Top_Stocks
+  // detail table) is checked FIRST, since those rows sit nested inside
+  // the section row's rendered output. closest() starts at the actual
+  // click target and walks outward, so a click on a stock row matches
+  // "tr[data-ticker]" immediately -- the outer .rrg-row (which carries
+  // data-subsector, never data-ticker) is only reached, and only
+  // matches, when the click was NOT on a stock row. No stopPropagation
+  // needed: the two selectors are mutually exclusive by construction.
+  const stockRow = e.target.closest("tr[data-ticker]");
+  if(stockRow){
+    openTickerChart(stockRow.dataset.ticker);
+    return;
+  }
+
+  const row = e.target.closest(".rrg-row");
+  if(!row) return;
+  const key = row.dataset.subsector;
+  if(rrgExpanded.has(key)) rrgExpanded.delete(key);
+  else rrgExpanded.add(key);
+  sortAndRenderRRG();
+});
+
+document.getElementById("rrgCards").addEventListener("click", (e)=>{
+  // Same precedence logic as rrgBody above: a stock row click is checked
+  // first. In the card layout these are structurally separate anyway
+  // (.card-stock-row sits inside .card-top-stocks, never inside the
+  // toggle <button>), so this ordering is a formality here rather than
+  // a strict requirement -- but keeping it consistent with the table
+  // handler avoids having to remember two different conventions.
+  const stockRow = e.target.closest(".card-stock-row[data-ticker]");
+  if(stockRow){
+    openTickerChart(stockRow.dataset.ticker);
+    return;
+  }
+
+  const btn = e.target.closest("[data-subsector-toggle]");
+  if(!btn) return;
+  const key = btn.dataset.subsectorToggle;
+  const list = document.querySelector(`[data-subsector-list="${CSS.escape(key)}"]`);
+  if(!list) return;
+  const willOpen = !list.classList.contains("open");
+  list.classList.toggle("open", willOpen);
+  btn.textContent = willOpen ? "Hide top stocks" : "Show top stocks";
+});
+
+function renderRRGChart(chartSeries, rebaseDate, asOfWeek){
+  const caption = document.getElementById("rrgChartCaption");
+  const wrap = document.querySelector("#panel-rrg .chart-wrap");
+
+  if(typeof Chart === "undefined"){
+    wrap.innerHTML = '<div class="empty-state">Chart library failed to load. The table below is unaffected — try a hard refresh.</div>';
+    caption.textContent = "";
+    return;
+  }
+  if(!chartSeries || !chartSeries.length){
+    wrap.innerHTML = '<div class="empty-state">No chart data in today\'s run.</div>';
+    caption.textContent = "";
+    return;
+  }
+
+  const dateSet = new Set();
+  chartSeries.forEach(s => s.series.forEach(p => dateSet.add(p.date)));
+  const labels = Array.from(dateSet).sort();
+
+  const palette = ["#C1592B", "#2B6E63", "#5B4B8A", "#A8842B", "#2E5A9C"];
+
+  const datasets = chartSeries.map((s, i) => {
+    const map = {};
+    s.series.forEach(p => map[p.date] = p.ratio);
+    return {
+      label: s.Sub_Sector,
+      data: labels.map(d => (d in map) ? map[d] : null),
+      borderColor: palette[i % palette.length],
+      backgroundColor: palette[i % palette.length],
+      borderWidth: 2,
+      pointRadius: 0,
+      tension: 0.15,
+      spanGaps: true,
+    };
+  });
+
+  datasets.push({
+    label: "Equal performance (1.0)",
+    data: labels.map(() => 1.0),
+    borderColor: "#9AA0A6",
+    borderDash: [4, 4],
+    borderWidth: 1,
+    pointRadius: 0,
+    fill: false,
+  });
+
+  if(rrgChartInstance) rrgChartInstance.destroy();
+  rrgChartInstance = new Chart(document.getElementById("rrgChart").getContext("2d"), {
+    type: "line",
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(3) : "—"}` } }
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 8, font: { size: 10 } } },
+        y: { title: { display: true, text: "RS Ratio (basket ÷ top-500 benchmark)", font: { size: 11 } } }
+      }
+    }
+  });
+
+  const rebaseDisplay = rebaseDate ? new Date(rebaseDate).toLocaleDateString("en-GB", {day: "2-digit", month: "short", year: "numeric"}) : "—";
+  caption.textContent = `Rebased to 1.0 on ${rebaseDisplay}. Line above 1.0 = outperforming the top-500 benchmark; below = underperforming. As of week ending ${asOfWeek || "—"}.`;
+}
+
+document.querySelectorAll(".tab-btn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    // If the chart view is open, switching tabs directly (rather than
+    // clicking "Back") should still leave things in a consistent state --
+    // close it first so we don't end up with the chart floating over the
+    // wrong tab, or a hidden panel never getting reactivated.
+    if(document.getElementById("tickerChartView").style.display !== "none"){
+      closeTickerChart();
+    }
+    document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("panel-" + btn.dataset.tab).classList.add("active");
+  });
+});
+
+document.querySelectorAll("#focusTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    focusSort.dir = (focusSort.key === key) ? -focusSort.dir : -1;
+    focusSort.key = key;
+    sortAndRenderFocus();
+  });
+});
+
+document.querySelectorAll("#convTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    convSort.dir = (convSort.key === key) ? -convSort.dir : -1;
+    convSort.key = key;
+    sortAndRenderConv();
+  });
+});
+
+document.querySelectorAll("#dispUpTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    dispUpSort.dir = (dispUpSort.key === key) ? -dispUpSort.dir : -1;
+    dispUpSort.key = key;
+    sortAndRenderDisp();
+  });
+});
+
+document.querySelectorAll("#dispDnTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    dispDnSort.dir = (dispDnSort.key === key) ? -dispDnSort.dir : -1;
+    dispDnSort.key = key;
+    sortAndRenderDisp();
+  });
+});
+
+document.querySelectorAll("#dispSectorTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    dispSectorSort.dir = (dispSectorSort.key === key) ? -dispSectorSort.dir : -1;
+    dispSectorSort.key = key;
+    sortAndRenderDisp();
+  });
+});
+
+document.querySelectorAll("#themeTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    themeSort.dir = (themeSort.key === key) ? -themeSort.dir : -1;
+    themeSort.key = key;
+    sortAndRenderTheme();
+  });
+});
+
+document.querySelectorAll("#rrgTable thead th").forEach(th=>{
+  th.addEventListener("click", (e)=>{
+    e.stopPropagation();
+    const key = th.dataset.key;
+    rrgSort.dir = (rrgSort.key === key) ? -rrgSort.dir : -1;
+    rrgSort.key = key;
+    sortAndRenderRRG();
+  });
+});
+
+(function initUpdateButton(){
+  const btn = document.getElementById("update-btn");
+  const status = document.getElementById("update-status");
+  const ENDPOINT = "/api/trigger-refresh";
+  const POLL_INTERVAL_MS = 20000;   // 20s between checks
+  const POLL_MAX_ATTEMPTS = 45;     // 45 * 20s = 15 min ceiling, comfortably above the slowest observed run (~9m30s) plus dispatch latency
+
+  let lastKnownRunStamp = null;   // run_date_display value seen before the current trigger
+  let pollTimer = null;
+  let pollAttempts = 0;
+  let remainingAfterTrigger = null;
+  let limitAfterTrigger = null;
+
+  function render(remaining, limit, disabledReason){
+    btn.textContent = "Update";
+    btn.disabled = remaining <= 0 || !!disabledReason;
+    status.textContent = disabledReason ? disabledReason : `${remaining}/${limit} refreshes left today`;
+  }
+
+  async function fetchCurrentRunStamp(){
+    // Independent of loadData() so a failure here never blocks the main dashboard fetch.
+    const res = await fetch(DATA_URL, { cache: "no-store" });
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const json = await res.json();
+    return json.run_date_display || json.run_date || null;
+  }
+
+  function stopPolling(){
+    if(pollTimer){
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+    pollAttempts = 0;
+  }
+
+  function pollForCompletion(){
+    stopPolling(); // cancel any previous poll loop before starting a new one
+
+    const tick = async () => {
+      pollAttempts++;
+      try{
+        const currentStamp = await fetchCurrentRunStamp();
+        if(currentStamp && currentStamp !== lastKnownRunStamp){
+          // New data has landed — refresh every panel AND every other data
+          // source the page loaded at startup. loadData() alone used to be
+          // called here, which left the Ask tab (qaData) and chart data
+          // (priceSeriesData) silently stale after clicking Update: the
+          // tables/scanners would show the new run, but Q&A answers and
+          // ticker charts would still reflect whatever loaded when the
+          // page first opened, until a manual browser refresh.
+          status.textContent = `Done — data updated (${currentStamp}). Refreshing view...`;
+          await Promise.all([loadData(), loadQA(), loadPriceSeries()]);
+          renderAskButtons(); // qaData just changed; re-render the question list so new/changed questions show up
+          status.textContent = `Done — data updated (${currentStamp}). ${remainingAfterTrigger}/${limitAfterTrigger} left today.`;
+          btn.disabled = remainingAfterTrigger <= 0;
+          return; // stop polling, we're done
+        }
+      }catch(e){
+        // A single failed poll (transient network blip) shouldn't kill the whole wait —
+        // just skip this tick and try again on the next one.
+      }
+
+      if(pollAttempts >= POLL_MAX_ATTEMPTS){
+        status.textContent = `Still running after 15 min — check back shortly. ${remainingAfterTrigger}/${limitAfterTrigger} left today.`;
+        btn.disabled = remainingAfterTrigger <= 0;
+        return;
+      }
+
+      pollTimer = setTimeout(tick, POLL_INTERVAL_MS);
+    };
+
+    pollTimer = setTimeout(tick, POLL_INTERVAL_MS);
+  }
+
+  async function checkStatus(){
+    try{
+      const res = await fetch(ENDPOINT, { method: "GET" });
+      const data = await res.json();
+      render(data.remaining, data.limit);
+    }catch(e){
+      btn.textContent = "Update";
+      btn.disabled = true;
+      status.textContent = "Status unavailable";
+    }
+  }
+
+  async function triggerUpdate(){
+    btn.disabled = true;
+    btn.textContent = "Triggering...";
+    status.textContent = "";
+
+    // Capture the baseline BEFORE dispatching, so we have something correct
+    // to compare against even if the run finishes unusually fast.
+    try{
+      lastKnownRunStamp = await fetchCurrentRunStamp();
+    }catch(e){
+      lastKnownRunStamp = null; // fall back gracefully; worst case we just wait for any non-null stamp
+    }
+
+    try{
+      const res = await fetch(ENDPOINT, { method: "POST" });
+      const data = await res.json();
+      if(res.status === 429){
+        render(0, data.limit, `Limit reached — resets at ${data.resets_at}`);
+        return;
+      }
+      if(!res.ok) throw new Error(data.error || "Unknown error");
+
+      remainingAfterTrigger = data.remaining;
+      limitAfterTrigger = data.limit;
+      btn.textContent = "Update";
+      btn.disabled = true; // stays disabled while we wait, even if refreshes remain — avoids double-triggers mid-poll
+      status.textContent = `Triggered. Waiting for it to finish (usually 7-9 min)...`;
+
+      pollForCompletion();
+    }catch(e){
+      btn.textContent = "Update";
+      btn.disabled = false;
+      status.textContent = "Failed to trigger — try again";
+    }
+  }
+
+  btn.addEventListener("click", triggerUpdate);
+  checkStatus();
+})();
+
 loadData();
+loadQA();
 loadPriceSeries();
 </script>
 </body>
