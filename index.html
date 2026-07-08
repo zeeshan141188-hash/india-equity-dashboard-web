@@ -1146,6 +1146,18 @@ function renderRRGChart(series, rebaseDate, asOfWeek) {
   // Keeping template structure intact
 }
 
+// Added missing function to prevent crash
+async function loadPriceSeries(){
+  try {
+    const res = await fetch(PRICE_SERIES_URL, {cache: "no-store"});
+    if(res.ok) {
+      priceSeriesData = await res.json();
+    }
+  } catch(e) {
+    console.error("Could not load price series data:", e);
+  }
+}
+
 // Initial setup hooks
 setupUniversalChartTriggers();
 loadData();
