@@ -783,6 +783,16 @@ function renderStatus(json){
 
 function renderAskButtons(){
   const container = document.getElementById("askButtons");
+
+  // Whenever the button list is rebuilt (initial load OR a post-Update
+  // refresh), any previously-shown answer is now stale -- qaData may have
+  // reordered or changed entirely, and innerHTML replacement below drops
+  // the old .active state anyway. Hide it and make the person re-select
+  // rather than risk showing an answer that no longer matches its button.
+  const box = document.getElementById("askAnswerBox");
+  box.style.display = "none";
+  box.textContent = "";
+
   if(!qaData.length){
     container.innerHTML = '<div class="empty-state">Q&amp;A data not available right now.</div>';
     return;
@@ -1093,7 +1103,7 @@ function renderTickerChart(){
       datasets: [
         { label: "Close", data: series.close, borderColor: "#14171A", backgroundColor: "#14171A", borderWidth: 2, pointRadius: 0, tension: 0.1 },
         { label: "EMA 12", data: series.ema12, borderColor: "#2B6E63", backgroundColor: "#2B6E63", borderWidth: 1.5, pointRadius: 0, tension: 0.1 },
-        { label: "EMA 26", data: series.ema26, borderColor: "#B23A2E", backgroundColor: "#B23A2E", borderWidth: 1.5, pointRadius: 0, tension: 0.1 },
+        { label: "EMA 26", data: series.ema26, borderColor: "#5B4B8A", backgroundColor: "#5B4B8A", borderWidth: 1.5, pointRadius: 0, tension: 0.1 },
       ]
     },
     options: {
@@ -1735,9 +1745,16 @@ document.querySelectorAll("#rrgTable thead th").forEach(th=>{
       try{
         const currentStamp = await fetchCurrentRunStamp();
         if(currentStamp && currentStamp !== lastKnownRunStamp){
-          // New data has landed — refresh every panel using the existing loader.
+          // New data has landed — refresh every panel AND every other data
+          // source the page loaded at startup. loadData() alone used to be
+          // called here, which left the Ask tab (qaData) and chart data
+          // (priceSeriesData) silently stale after clicking Update: the
+          // tables/scanners would show the new run, but Q&A answers and
+          // ticker charts would still reflect whatever loaded when the
+          // page first opened, until a manual browser refresh.
           status.textContent = `Done — data updated (${currentStamp}). Refreshing view...`;
-          await loadData();
+          await Promise.all([loadData(), loadQA(), loadPriceSeries()]);
+          renderAskButtons(); // qaData just changed; re-render the question list so new/changed questions show up
           status.textContent = `Done — data updated (${currentStamp}). ${remainingAfterTrigger}/${limitAfterTrigger} left today.`;
           btn.disabled = remainingAfterTrigger <= 0;
           return; // stop polling, we're done
