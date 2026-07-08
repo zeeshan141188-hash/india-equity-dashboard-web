@@ -647,7 +647,9 @@
           <th data-key="continuation_px" class="num">Cont. Price</th>
           <th data-key="ext_over_zone_pct" class="num">Ext over Zone %</th>
           <th data-key="grind_days" class="num">Grind Days</th>
+          <th data-key="duration_score" class="num">Duration</th>
           <th data-key="dq_score" class="num">DQ Score</th>
+          <th data-key="carry_bonus" class="num">Carry</th>
           <th data-key="grind_quality_score" class="num">Grind Quality</th>
           <th data-key="thrust_score" class="num">Thrust</th>
           <th data-key="final_score" class="num">Final Score</th>
@@ -1551,7 +1553,7 @@ function sortAndRenderGrind(){
 
   const caption = document.getElementById("grindCaption");
   caption.textContent = grindAsOfDate
-    ? `As of ${grindAsOfDate} · ${grindData.length} idea${grindData.length === 1 ? "" : "s"} · pattern is unvalidated against BQNT -- treat as a defensible simplification, not a proven match.`
+    ? `As of ${grindAsOfDate} · ${grindData.length} idea${grindData.length === 1 ? "" : "s"} · pattern is unvalidated against BQNT -- treat as a defensible simplification, not a proven match. Duration and Carry reflect a 2026-07 redesign (ATR-contraction-gated resets, decaying score carryover) rather than a hard day-count cutoff.`
     : "";
 
   if(!rows.length){
@@ -1567,7 +1569,9 @@ function sortAndRenderGrind(){
       <td class="num">₹${fmt(r.continuation_px)}</td>
       <td class="num">${r.ext_over_zone_pct >= 0 ? '+' : ''}${fmt(r.ext_over_zone_pct,2)}%</td>
       <td class="num">${r.grind_days}</td>
+      <td class="num">${fmt(r.duration_score,2)}</td>
       <td class="num">${fmt(r.dq_score,1)}</td>
+      <td class="num">${fmt(r.carry_bonus,2)}</td>
       <td class="num">${fmt(r.grind_quality_score,3)}</td>
       <td class="num">${fmt(r.thrust_score,3)}</td>
       <td class="num score-cell">${fmt(r.final_score,3)}</td>
@@ -1590,7 +1594,9 @@ function sortAndRenderGrind(){
         <span>Cont. Price <b>₹${fmt(r.continuation_px)}</b></span>
         <span>Ext over Zone <b>${r.ext_over_zone_pct >= 0 ? '+' : ''}${fmt(r.ext_over_zone_pct,2)}%</b></span>
         <span>Grind Days <b>${r.grind_days}</b></span>
+        <span>Duration <b>${fmt(r.duration_score,2)}</b></span>
         <span>DQ Score <b>${fmt(r.dq_score,1)}</b></span>
+        <span>Carry <b>${fmt(r.carry_bonus,2)}</b></span>
         <span>Grind Quality <b>${fmt(r.grind_quality_score,3)}</b></span>
         <span>Thrust <b>${fmt(r.thrust_score,3)}</b></span>
       </div>
