@@ -422,7 +422,9 @@
   #focusCards .card{cursor:pointer;}
   #dispUpBody tr, #dispDnBody tr{cursor:pointer;}
   #dispUpCards .card, #dispDnCards .card{cursor:pointer;}
-
+  #drawdownBody tr{cursor:pointer;}
+  #drawdownCards .card{cursor:pointer;}
+  
   .chart-back-btn{
     display:inline-flex;
     align-items:center;
@@ -641,6 +643,8 @@
       <thead>
         <tr>
           <th data-key="ID">Ticker</th>
+          <th data-key="dd_high" class="num">DD High</th>
+          <th data-key="dd_low" class="num">DD Low</th>
           <th data-key="dd_mag_pct" class="num">DD Magnitude %</th>
           <th data-key="struct_floor">Struct Floor</th>
           <th data-key="weeks_above_ddh" class="num">Weeks Above DD High</th>
@@ -1013,6 +1017,13 @@ function sortAndRenderFocus(){
   `).join("");
 }
 
+function fmtDate(d){
+  if(!d) return "—";
+  const parsed = new Date(d);
+  if(isNaN(parsed)) return "—";
+  return parsed.toLocaleDateString("en-GB", {day:"2-digit", month:"short", year:"numeric"});
+}
+
 function sortAndRenderDrawdown(){
   const sorted = sortRows(drawdownData, drawdownSort);
 
@@ -1025,10 +1036,6 @@ function sortAndRenderDrawdown(){
     return;
   }
 
-  // Tier string comes through as e.g. "****  NEW CAMPAIGN" / "***   BUILD" /
-  // "**    WATCH" -- strip the stars/padding to get a clean CSS class and
-  // label, same spirit as the .tag classes used elsewhere (Explosive/Gradual
-  // etc.) rather than inventing a new badge pattern for this one tab.
   function tierClass(tier){
     if((tier || "").includes("NEW CAMPAIGN")) return "Explosive";
     if((tier || "").includes("BUILD")) return "Persistence";
@@ -1041,6 +1048,8 @@ function sortAndRenderDrawdown(){
   body.innerHTML = sorted.map(r => `
     <tr data-ticker="${r.ID}">
       <td class="ticker">${cleanTicker(r.ID)}<span class="name-sub">${r.Sector || ""}</span></td>
+      <td class="num">₹${fmt(r.dd_high)}<span class="name-sub">${fmtDate(r.dd_high_date)}</span></td>
+      <td class="num">₹${fmt(r.dd_low)}<span class="name-sub">${fmtDate(r.dd_low_date)}</span></td>
       <td class="num">${fmt(r.dd_mag_pct)}%</td>
       <td>${r.struct_floor || "—"}</td>
       <td class="num">${r.weeks_above_ddh}</td>
@@ -1063,6 +1072,8 @@ function sortAndRenderDrawdown(){
         </div>
       </div>
       <div class="card-meta">
+        <span>DD High <b>₹${fmt(r.dd_high)} (${fmtDate(r.dd_high_date)})</b></span>
+        <span>DD Low <b>₹${fmt(r.dd_low)} (${fmtDate(r.dd_low_date)})</b></span>
         <span>DD Magnitude <b>${fmt(r.dd_mag_pct)}%</b></span>
         <span>Struct Floor <b>${r.struct_floor || "—"}</b></span>
         <span>Weeks Above DD High <b>${r.weeks_above_ddh}</b></span>
@@ -1071,7 +1082,6 @@ function sortAndRenderDrawdown(){
     </div>
   `).join("");
 }
-
 
 // Any tab can call openTickerChart(ticker): it hides whichever panel is
 // currently active, shows the shared #tickerChartView, and renders a
