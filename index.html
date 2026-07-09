@@ -422,8 +422,6 @@
   #focusCards .card{cursor:pointer;}
   #dispUpBody tr, #dispDnBody tr{cursor:pointer;}
   #dispUpCards .card, #dispDnCards .card{cursor:pointer;}
-  #grindBody tr{cursor:pointer;}
-  #grindCards .card{cursor:pointer;}
 
   .chart-back-btn{
     display:inline-flex;
@@ -473,7 +471,7 @@
     <button class="tab-btn" data-tab="displacement">Displacement Scanner</button>
     <button class="tab-btn" data-tab="theme">Theme Conviction</button>
     <button class="tab-btn" data-tab="rrg">Sector Rotation</button>
-    <button class="tab-btn" data-tab="grind">Grind to Breakout</button>
+    <button class="tab-btn" data-tab="drawdown">Drawdown Tracker</button>
     <button class="tab-btn" data-tab="ask">Ask</button>
   </div>
 
@@ -637,27 +635,23 @@
     <div class="cards" id="rrgCards"></div>
   </div>
 
-  <div class="panel" id="panel-grind">
-    <p class="sector-filter-caption" id="grindCaption" style="margin-bottom:14px;"></p>
-    <table id="grindTable">
+  <div class="panel" id="panel-drawdown">
+    <div class="disp-subhead">DD Absorption Setups — Ranked by Structural Floor + Hold Quality + Reversal Momentum · Click a row for chart</div>
+    <table id="drawdownTable">
       <thead>
         <tr>
           <th data-key="ID">Ticker</th>
-          <th data-key="Sector">Sector</th>
-          <th data-key="continuation_px" class="num">Cont. Price</th>
-          <th data-key="ext_over_zone_pct" class="num">Ext over Zone %</th>
-          <th data-key="grind_days" class="num">Grind Days</th>
-          <th data-key="duration_score" class="num">Duration</th>
-          <th data-key="dq_score" class="num">DQ Score</th>
-          <th data-key="carry_bonus" class="num">Carry</th>
-          <th data-key="grind_quality_score" class="num">Grind Quality</th>
-          <th data-key="thrust_score" class="num">Thrust</th>
-          <th data-key="final_score" class="num">Final Score</th>
+          <th data-key="dd_mag_pct" class="num">DD Magnitude %</th>
+          <th data-key="struct_floor">Struct Floor</th>
+          <th data-key="weeks_above_ddh" class="num">Weeks Above DD High</th>
+          <th data-key="reversal_disp_z" class="num">Reversal Z</th>
+          <th data-key="total_score" class="num">Score</th>
+          <th data-key="tier">Tier</th>
         </tr>
       </thead>
-      <tbody id="grindBody"></tbody>
+      <tbody id="drawdownBody"></tbody>
     </table>
-    <div class="cards" id="grindCards"></div>
+    <div class="cards" id="drawdownCards"></div>
   </div>
 
   <div class="panel" id="panel-ask">
@@ -720,8 +714,7 @@ let dispDnData = [];
 let dispSectorData = [];
 let themeData = [];
 let rrgData = [];
-let grindData = [];
-let grindAsOfDate = null;
+let drawdownData = [];
 let focusSort = { key: "PM_Score", dir: -1 };
 let convSort = { key: "conviction", dir: -1 };
 let dispUpSort = { key: "Score", dir: -1 };
@@ -729,7 +722,7 @@ let dispDnSort = { key: "Score", dir: -1 };
 let dispSectorSort = { key: "Conviction", dir: -1 };
 let themeSort = { key: "Conviction", dir: -1 };
 let rrgSort = { key: "Combined_Score", dir: -1 };
-let grindSort = { key: "final_score", dir: -1 };
+let drawdownSort = { key: "total_score", dir: -1 };
 let rrgChartInstance = null;
 
 // Which sub-sector is currently selected in the Focus Screen sector filter.
@@ -777,9 +770,8 @@ async function loadData(){
     themeData = theme.themes || [];
     const rrg = json.sector_rrg || {};
     rrgData = rrg.sub_sectors || [];
-    const grind = json.grind_to_breakout || {};
-    grindData = grind.ideas || [];
-    grindAsOfDate = grind.as_of_date || null;
+    const dd = json.drawdown_tracker || {};
+    drawdownData = dd.ranked || [];
     populateFocusSectorFilter();
     populateDispSectorFilter();
     populateThemeSectorFilter();
@@ -788,7 +780,7 @@ async function loadData(){
     sortAndRenderDisp();
     sortAndRenderTheme();
     sortAndRenderRRG();
-    sortAndRenderGrind();
+    sortAndRenderDrawdown();
     renderRRGChart(rrg.chart_series || [], rrg.rebase_date, rrg.as_of_week);
   }catch(err){
     document.getElementById("statusDot").className = "dot err";
@@ -1021,7 +1013,66 @@ function sortAndRenderFocus(){
   `).join("");
 }
 
-// ---- Ticker chart detail view (shared across tabs) ----
+function sortAndRenderDrawdown(){
+  const sorted = sortRows(drawdownData, drawdownSort);
+
+  const body = document.getElementById("drawdownBody");
+  const cards = document.getElementById("drawdownCards");
+
+  if(!sorted.length){
+    body.innerHTML = "";
+    cards.innerHTML = '<div class="empty-state">No qualifying absorption setups in today\'s run.</div>';
+    return;
+  }
+
+  // Tier string comes through as e.g. "****  NEW CAMPAIGN" / "***   BUILD" /
+  // "**    WATCH" -- strip the stars/padding to get a clean CSS class and
+  // label, same spirit as the .tag classes used elsewhere (Explosive/Gradual
+  // etc.) rather than inventing a new badge pattern for this one tab.
+  function tierClass(tier){
+    if((tier || "").includes("NEW CAMPAIGN")) return "Explosive";
+    if((tier || "").includes("BUILD")) return "Persistence";
+    return "DQ";
+  }
+  function tierLabel(tier){
+    return (tier || "").replace(/\*/g, "").trim();
+  }
+
+  body.innerHTML = sorted.map(r => `
+    <tr data-ticker="${r.ID}">
+      <td class="ticker">${cleanTicker(r.ID)}<span class="name-sub">${r.Sector || ""}</span></td>
+      <td class="num">${fmt(r.dd_mag_pct)}%</td>
+      <td>${r.struct_floor || "—"}</td>
+      <td class="num">${r.weeks_above_ddh}</td>
+      <td class="num">${fmt(r.reversal_disp_z, 2)}</td>
+      <td class="num score-cell">${r.total_score}</td>
+      <td><span class="tag ${tierClass(r.tier)}">${tierLabel(r.tier)}</span></td>
+    </tr>
+  `).join("");
+
+  cards.innerHTML = sorted.map(r => `
+    <div class="card" data-ticker="${r.ID}">
+      <div class="card-top">
+        <div>
+          <div class="card-ticker">${cleanTicker(r.ID)}</div>
+          <div class="card-name">${r.Sector || ""} · <span class="tag ${tierClass(r.tier)}">${tierLabel(r.tier)}</span></div>
+        </div>
+        <div>
+          <div class="card-score">${r.total_score}</div>
+          <div class="card-score-label">DD Score</div>
+        </div>
+      </div>
+      <div class="card-meta">
+        <span>DD Magnitude <b>${fmt(r.dd_mag_pct)}%</b></span>
+        <span>Struct Floor <b>${r.struct_floor || "—"}</b></span>
+        <span>Weeks Above DD High <b>${r.weeks_above_ddh}</b></span>
+        <span>Reversal Z <b>${fmt(r.reversal_disp_z, 2)}</b></span>
+      </div>
+    </div>
+  `).join("");
+}
+
+
 // Any tab can call openTickerChart(ticker): it hides whichever panel is
 // currently active, shows the shared #tickerChartView, and renders a
 // single static Close/EMA12/EMA26 line chart from priceSeriesData --
@@ -1053,13 +1104,13 @@ function findTickerMeta(ticker){
   // Sub-Sector Conviction rows use lowercase `sector` (see sortAndRenderConv) --
   // deliberately matching the field name as-is rather than normalizing it here.
   if(inConv) return { name: null, sector: inConv.sector };
-  const inGrind = grindData.find(r => r.ID === ticker);
-  if(inGrind) return { name: null, sector: inGrind.Sector };
   const inTheme = themeData.find(t => t.Lead_Stock === ticker);
   // Theme rows don't carry a Sector field at all (only Sub_Sector -- see
   // getSectorForSubSector() for why), so fall back to the sub-sector name
   // itself rather than showing a blank subtitle.
   if(inTheme) return { name: null, sector: inTheme.Sub_Sector };
+  const inDrawdown = drawdownData.find(r => r.ID === ticker);
+  if(inDrawdown) return { name: null, sector: inDrawdown.Sector };
   return { name: null, sector: null };
 }
 
@@ -1197,6 +1248,17 @@ document.getElementById("dispDnCards").addEventListener("click", (e)=>{
 });
 
 document.getElementById("tickerChartBack").addEventListener("click", closeTickerChart);
+
+document.getElementById("drawdownBody").addEventListener("click", (e)=>{
+  const row = e.target.closest("tr[data-ticker]");
+  if(!row) return;
+  openTickerChart(row.dataset.ticker);
+});
+document.getElementById("drawdownCards").addEventListener("click", (e)=>{
+  const card = e.target.closest(".card[data-ticker]");
+  if(!card) return;
+  openTickerChart(card.dataset.ticker);
+});
 
 // Single global handler for the .ticker-link pattern (single-cell-clickable
 // ticker references inside an otherwise non-stock row: Theme Conviction's
@@ -1542,88 +1604,6 @@ function sortAndRenderRRG(){
   }).join("");
 }
 
-// ---- Grind to Breakout ----
-// UNVALIDATED against BQNT (see grind_to_breakout.py header) -- surfaced
-// in the caption rather than silently treated the same as every other
-// (validated) tab.
-function sortAndRenderGrind(){
-  const rows = sortRows(grindData, grindSort);
-  const body = document.getElementById("grindBody");
-  const cards = document.getElementById("grindCards");
-
-  const caption = document.getElementById("grindCaption");
-  caption.textContent = grindAsOfDate
-    ? `As of ${grindAsOfDate} · ${grindData.length} idea${grindData.length === 1 ? "" : "s"} · pattern is unvalidated against BQNT -- treat as a defensible simplification, not a proven match. Duration and Carry reflect a 2026-07 redesign (ATR-contraction-gated resets, decaying score carryover) rather than a hard day-count cutoff.`
-    : "";
-
-  if(!rows.length){
-    body.innerHTML = "";
-    cards.innerHTML = '<div class="empty-state">No qualifying grind-to-breakout patterns in today\'s run.</div>';
-    return;
-  }
-
-  body.innerHTML = rows.map(r => `
-    <tr data-ticker="${r.ID}">
-      <td class="ticker">${cleanTicker(r.ID)}</td>
-      <td>${r.Sector}<span class="name-sub">${r.Sub_Sector || ""}</span></td>
-      <td class="num">₹${fmt(r.continuation_px)}</td>
-      <td class="num">${r.ext_over_zone_pct >= 0 ? '+' : ''}${fmt(r.ext_over_zone_pct,2)}%</td>
-      <td class="num">${r.grind_days}</td>
-      <td class="num">${fmt(r.duration_score,2)}</td>
-      <td class="num">${fmt(r.dq_score,1)}</td>
-      <td class="num">${fmt(r.carry_bonus,2)}</td>
-      <td class="num">${fmt(r.grind_quality_score,3)}</td>
-      <td class="num">${fmt(r.thrust_score,3)}</td>
-      <td class="num score-cell">${fmt(r.final_score,3)}</td>
-    </tr>
-  `).join("");
-
-  cards.innerHTML = rows.map(r => `
-    <div class="card" data-ticker="${r.ID}">
-      <div class="card-top">
-        <div>
-          <div class="card-ticker">${cleanTicker(r.ID)}</div>
-          <div class="card-name">${r.Sector} · continuation ${fmt(r.grind_days,0)}d grind</div>
-        </div>
-        <div>
-          <div class="card-score">${fmt(r.final_score,3)}</div>
-          <div class="card-score-label">Final Score</div>
-        </div>
-      </div>
-      <div class="card-meta">
-        <span>Cont. Price <b>₹${fmt(r.continuation_px)}</b></span>
-        <span>Ext over Zone <b>${r.ext_over_zone_pct >= 0 ? '+' : ''}${fmt(r.ext_over_zone_pct,2)}%</b></span>
-        <span>Grind Days <b>${r.grind_days}</b></span>
-        <span>Duration <b>${fmt(r.duration_score,2)}</b></span>
-        <span>DQ Score <b>${fmt(r.dq_score,1)}</b></span>
-        <span>Carry <b>${fmt(r.carry_bonus,2)}</b></span>
-        <span>Grind Quality <b>${fmt(r.grind_quality_score,3)}</b></span>
-        <span>Thrust <b>${fmt(r.thrust_score,3)}</b></span>
-      </div>
-    </div>
-  `).join("");
-}
-
-document.getElementById("grindBody").addEventListener("click", (e)=>{
-  const row = e.target.closest("tr[data-ticker]");
-  if(!row) return;
-  openTickerChart(row.dataset.ticker);
-});
-document.getElementById("grindCards").addEventListener("click", (e)=>{
-  const card = e.target.closest(".card[data-ticker]");
-  if(!card) return;
-  openTickerChart(card.dataset.ticker);
-});
-
-document.querySelectorAll("#grindTable thead th").forEach(th=>{
-  th.addEventListener("click", ()=>{
-    const key = th.dataset.key;
-    grindSort.dir = (grindSort.key === key) ? -grindSort.dir : -1;
-    grindSort.key = key;
-    sortAndRenderGrind();
-  });
-});
-
 document.getElementById("rrgBody").addEventListener("click", (e)=>{
   // Stock-level click (a row inside an expanded sub-sector's Top_Stocks
   // detail table) is checked FIRST, since those rows sit nested inside
@@ -1816,6 +1796,15 @@ document.querySelectorAll("#rrgTable thead th").forEach(th=>{
     rrgSort.dir = (rrgSort.key === key) ? -rrgSort.dir : -1;
     rrgSort.key = key;
     sortAndRenderRRG();
+  });
+});
+
+document.querySelectorAll("#drawdownTable thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.key;
+    drawdownSort.dir = (drawdownSort.key === key) ? -drawdownSort.dir : -1;
+    drawdownSort.key = key;
+    sortAndRenderDrawdown();
   });
 });
 
