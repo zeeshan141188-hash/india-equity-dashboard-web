@@ -629,6 +629,8 @@
           <th data-key="rs_ratio" class="num">RS Ratio</th>
           <th data-key="mom_4w_pct" class="num">4w Mom %</th>
           <th data-key="struct_rank_display">Structural High</th>
+          <th data-key="Disp_Density_Z" class="num">Breadth Z</th>
+          <th data-key="Disp_Conviction" class="num">Breadth Conv.</th>
           <th data-key="Combined_Score" class="num">Score</th>
         </tr>
       </thead>
@@ -1571,12 +1573,14 @@ function sortAndRenderRRG(){
         <td class="num">${fmt(r.rs_ratio,3)}</td>
         <td class="num">${r.mom_4w_pct >= 0 ? '+' : ''}${fmt(r.mom_4w_pct,2)}%</td>
         <td>${highBadges(r)}</td>
+        <td class="num">${fmt(r.Disp_Density_Z,2)}</td>
+        <td class="num">${fmt(r.Disp_Conviction,1)}</td>
         <td class="num score-cell">${fmt(r.Combined_Score,1)}</td>
       </tr>
     `;
     const detailRow = isOpen ? `
       <tr class="rrg-detail-row">
-        <td colspan="7">${renderRRGStockDetail(r)}</td>
+        <td colspan="9">${renderRRGStockDetail(r)}</td>
       </tr>
     ` : "";
     return mainRow + detailRow;
@@ -1606,6 +1610,7 @@ function sortAndRenderRRG(){
         <div class="card-meta" style="margin-top:8px;">
           <span>RS Ratio <b>${fmt(r.rs_ratio,3)}</b></span>
           <span>4w Mom <b>${r.mom_4w_pct >= 0 ? '+' : ''}${fmt(r.mom_4w_pct,2)}%</b></span>
+          <span>Breadth Z <b>${fmt(r.Disp_Density_Z,2)}</b></span>
         </div>
         <button class="card-toggle-btn" data-subsector-toggle="${r.Sub_Sector}">Show top stocks</button>
         <div class="card-top-stocks" data-subsector-list="${r.Sub_Sector}">${stocksHtml}</div>
