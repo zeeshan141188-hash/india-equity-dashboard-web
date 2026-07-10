@@ -438,6 +438,114 @@
     margin-bottom:16px;
   }
 
+  .pmnote-layout{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+    align-items:start;
+  }
+  .pmnote-feedback-col{
+    background:var(--card);
+    border-radius:var(--radius);
+    padding:16px;
+    box-shadow:0 1px 2px rgba(20,23,26,0.04);
+  }
+  .pmnote-feedback-label{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:12px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    color:var(--violet);
+    margin-bottom:8px;
+  }
+  #pmFeedbackText{
+    width:100%;
+    min-height:140px;
+    resize:vertical;
+    font-family:'Inter',sans-serif;
+    font-size:13.5px;
+    line-height:1.5;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    color:var(--ink);
+    background:var(--bg);
+  }
+  #pmFeedbackText:focus{outline:none;border-color:var(--violet);}
+  .pmnote-feedback-meta{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:8px;
+  }
+  #pmFeedbackCharCount{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--sub);
+  }
+  #pmFeedbackSubmit{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    padding:8px 16px;
+    border-radius:8px;
+    border:1px solid var(--violet);
+    background:var(--violet-bg);
+    color:var(--violet);
+    cursor:pointer;
+    transition:background .15s ease;
+  }
+  #pmFeedbackSubmit:hover:not(:disabled){background:#E3DCF2;}
+  #pmFeedbackSubmit:disabled{cursor:default;opacity:0.55;}
+  #pmFeedbackStatus{
+    font-size:12px;
+    color:var(--sub);
+    margin-top:8px;
+    min-height:16px;
+  }
+  #pmFeedbackStatus.err{color:var(--err);}
+
+  .pmnote-comparison{
+    margin-top:16px;
+    background:var(--teal-bg);
+    border-radius:var(--radius);
+    padding:16px;
+  }
+  .pmnote-comparison-row{margin-bottom:10px;}
+  .pmnote-comparison-row:last-child{margin-bottom:0;}
+  .pmnote-comparison-label{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:11.5px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    color:var(--teal);
+    margin-bottom:3px;
+  }
+  .pmnote-comparison-body{
+    font-size:13px;
+    line-height:1.55;
+    color:var(--ink);
+  }
+  .pmnote-divergence-tag{
+    display:inline-block;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:10.5px;
+    font-weight:600;
+    padding:2px 8px;
+    border-radius:20px;
+    margin-left:6px;
+    vertical-align:middle;
+  }
+  .pmnote-divergence-tag.interpretation{background:var(--gold-bg);color:var(--gold);}
+  .pmnote-divergence-tag.factual_gap{background:var(--copper-bg);color:var(--copper);}
+  .pmnote-divergence-tag.none{background:var(--teal-bg);color:var(--teal);}
+
+  @media (max-width:680px){
+    .pmnote-layout{grid-template-columns:1fr;}
+  }
+
   @media (max-width:680px){
     table{display:none;}
     .cards{display:flex;}
@@ -726,6 +834,23 @@
     <div id="pmNoteContent">
       <div class="empty-state">Loading PM Note...</div>
     </div>
+    <div class="pmnote-layout" id="pmNoteFeedbackLayout" style="display:none;">
+      <div class="pmnote-feedback-col">
+        <div class="pmnote-feedback-label">Comparison</div>
+        <div id="pmNoteComparisonResult">
+          <div class="pmnote-section-body" style="color:var(--sub);">Submit your view on the right to see how it compares against today's PM Note.</div>
+        </div>
+      </div>
+      <div class="pmnote-feedback-col">
+        <div class="pmnote-feedback-label">Your Market View</div>
+        <textarea id="pmFeedbackText" maxlength="2000" placeholder="What's your read on today's market? e.g. Materials strength looks durable to me, not just a one-day pop..."></textarea>
+        <div class="pmnote-feedback-meta">
+          <span id="pmFeedbackCharCount">0 / 2000</span>
+          <button id="pmFeedbackSubmit">Compare</button>
+        </div>
+        <div id="pmFeedbackStatus"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Shared ticker chart detail view -- NOT a .panel, so tab-switching CSS
@@ -962,7 +1087,88 @@ function renderPMNote(note){
       </div>
     ` : "").join("")}
   `;
+
+  // Only reveal the feedback/comparison layout once a real note has
+  // loaded -- if pm_summary.json is missing (see loadPMNote's catch
+  // block), there's nothing meaningful to compare feedback against yet.
+  document.getElementById("pmNoteFeedbackLayout").style.display = "grid";
 }
+
+// ---- PM Note feedback box ----
+const pmFeedbackTextarea = document.getElementById("pmFeedbackText");
+const pmFeedbackCharCount = document.getElementById("pmFeedbackCharCount");
+const pmFeedbackSubmitBtn = document.getElementById("pmFeedbackSubmit");
+const pmFeedbackStatus = document.getElementById("pmFeedbackStatus");
+const pmNoteComparisonResult = document.getElementById("pmNoteComparisonResult");
+
+pmFeedbackTextarea.addEventListener("input", ()=>{
+  pmFeedbackCharCount.textContent = `${pmFeedbackTextarea.value.length} / 2000`;
+});
+
+function divergenceTagLabel(type){
+  if(type === "interpretation") return "Interpretation";
+  if(type === "factual_gap") return "Factual Gap";
+  return "No Divergence";
+}
+
+function renderComparison(comparison){
+  const tagClass = comparison.divergence_type || "none";
+  pmNoteComparisonResult.innerHTML = `
+    <div class="pmnote-comparison">
+      <div class="pmnote-comparison-row">
+        <div class="pmnote-comparison-label">Agreement</div>
+        <div class="pmnote-comparison-body">${comparison.agreement || "—"}</div>
+      </div>
+      <div class="pmnote-comparison-row">
+        <div class="pmnote-comparison-label">Divergence
+          <span class="pmnote-divergence-tag ${tagClass}">${divergenceTagLabel(comparison.divergence_type)}</span>
+        </div>
+        <div class="pmnote-comparison-body">${comparison.divergence || "—"}</div>
+      </div>
+      ${comparison.note_for_tomorrow ? `
+        <div class="pmnote-comparison-row">
+          <div class="pmnote-comparison-label">Noted for Tomorrow</div>
+          <div class="pmnote-comparison-body">${comparison.note_for_tomorrow}</div>
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+async function submitPMFeedback(){
+  const text = pmFeedbackTextarea.value.trim();
+  if(!text){
+    pmFeedbackStatus.textContent = "Enter your view before submitting.";
+    pmFeedbackStatus.classList.add("err");
+    return;
+  }
+
+  pmFeedbackSubmitBtn.disabled = true;
+  pmFeedbackSubmitBtn.textContent = "Comparing...";
+  pmFeedbackStatus.classList.remove("err");
+  pmFeedbackStatus.textContent = "";
+
+  try{
+    const res = await fetch("/api/pm-feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ feedback: text }),
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || "Unknown error");
+
+    renderComparison(data.comparison);
+    pmFeedbackStatus.textContent = "Compared and saved.";
+  }catch(err){
+    pmFeedbackStatus.textContent = "Failed to compare — " + err.message;
+    pmFeedbackStatus.classList.add("err");
+  }finally{
+    pmFeedbackSubmitBtn.disabled = false;
+    pmFeedbackSubmitBtn.textContent = "Compare";
+  }
+}
+
+pmFeedbackSubmitBtn.addEventListener("click", submitPMFeedback);
 
 function sortRows(rows, sortState){
   const {key, dir} = sortState;
