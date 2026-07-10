@@ -438,11 +438,19 @@
     margin-bottom:16px;
   }
 
-  .pmnote-layout{
+  .pmnote-page-layout{
     display:grid;
-    grid-template-columns:1fr 1fr;
+    grid-template-columns:1fr 340px;
     gap:16px;
     align-items:start;
+  }
+  .pmnote-main-col{min-width:0;}
+  .pmnote-side-col{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+    position:sticky;
+    top:64px;
   }
   .pmnote-feedback-col{
     background:var(--card);
@@ -507,10 +515,9 @@
   #pmFeedbackStatus.err{color:var(--err);}
 
   .pmnote-comparison{
-    margin-top:16px;
     background:var(--teal-bg);
     border-radius:var(--radius);
-    padding:16px;
+    padding:12px;
   }
   .pmnote-comparison-row{margin-bottom:10px;}
   .pmnote-comparison-row:last-child{margin-bottom:0;}
@@ -542,8 +549,9 @@
   .pmnote-divergence-tag.factual_gap{background:var(--copper-bg);color:var(--copper);}
   .pmnote-divergence-tag.none{background:var(--teal-bg);color:var(--teal);}
 
-  @media (max-width:680px){
-    .pmnote-layout{grid-template-columns:1fr;}
+  @media (max-width:900px){
+    .pmnote-page-layout{grid-template-columns:1fr;}
+    .pmnote-side-col{position:static;}
   }
 
   @media (max-width:680px){
@@ -831,24 +839,28 @@
   </div>
 
   <div class="panel" id="panel-pmnote">
-    <div id="pmNoteContent">
-      <div class="empty-state">Loading PM Note...</div>
-    </div>
-    <div class="pmnote-layout" id="pmNoteFeedbackLayout" style="display:none;">
-      <div class="pmnote-feedback-col">
-        <div class="pmnote-feedback-label">Comparison</div>
-        <div id="pmNoteComparisonResult">
-          <div class="pmnote-section-body" style="color:var(--sub);">Submit your view on the right to see how it compares against today's PM Note.</div>
+    <div class="pmnote-page-layout">
+      <div class="pmnote-main-col">
+        <div id="pmNoteContent">
+          <div class="empty-state">Loading PM Note...</div>
         </div>
       </div>
-      <div class="pmnote-feedback-col">
-        <div class="pmnote-feedback-label">Your Market View</div>
-        <textarea id="pmFeedbackText" maxlength="2000" placeholder="What's your read on today's market? e.g. Materials strength looks durable to me, not just a one-day pop..."></textarea>
-        <div class="pmnote-feedback-meta">
-          <span id="pmFeedbackCharCount">0 / 2000</span>
-          <button id="pmFeedbackSubmit">Compare</button>
+      <div class="pmnote-side-col" id="pmNoteFeedbackLayout" style="display:none;">
+        <div class="pmnote-feedback-col">
+          <div class="pmnote-feedback-label">Your Market View</div>
+          <textarea id="pmFeedbackText" maxlength="2000" placeholder="What's your read on today's market? e.g. Materials strength looks durable to me, not just a one-day pop..."></textarea>
+          <div class="pmnote-feedback-meta">
+            <span id="pmFeedbackCharCount">0 / 2000</span>
+            <button id="pmFeedbackSubmit">Compare</button>
+          </div>
+          <div id="pmFeedbackStatus"></div>
         </div>
-        <div id="pmFeedbackStatus"></div>
+        <div class="pmnote-feedback-col">
+          <div class="pmnote-feedback-label">Comparison</div>
+          <div id="pmNoteComparisonResult">
+            <div class="pmnote-section-body" style="color:var(--sub);">Submit your view above to see how it compares against today's PM Note.</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1091,7 +1103,7 @@ function renderPMNote(note){
   // Only reveal the feedback/comparison layout once a real note has
   // loaded -- if pm_summary.json is missing (see loadPMNote's catch
   // block), there's nothing meaningful to compare feedback against yet.
-  document.getElementById("pmNoteFeedbackLayout").style.display = "grid";
+  document.getElementById("pmNoteFeedbackLayout").style.display = "flex";
 }
 
 // ---- PM Note feedback box ----
