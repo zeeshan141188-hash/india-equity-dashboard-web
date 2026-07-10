@@ -398,6 +398,46 @@
     margin-top:14px;
   }
 
+  .pmnote-headline{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:17px;
+    line-height:1.4;
+    color:var(--ink);
+    background:var(--violet-bg);
+    border-radius:var(--radius);
+    padding:16px;
+    margin-bottom:16px;
+  }
+  .pmnote-section{
+    background:var(--card);
+    border-radius:var(--radius);
+    padding:16px;
+    margin-bottom:12px;
+    box-shadow:0 1px 2px rgba(20,23,26,0.04);
+  }
+  .pmnote-section-label{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:12px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    color:var(--violet);
+    margin-bottom:6px;
+  }
+  .pmnote-section-body{
+    font-size:13.5px;
+    line-height:1.6;
+    color:var(--ink);
+  }
+  .pmnote-meta{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--sub);
+    margin-top:4px;
+    margin-bottom:16px;
+  }
+
   @media (max-width:680px){
     table{display:none;}
     .cards{display:flex;}
@@ -475,6 +515,7 @@
     <button class="tab-btn" data-tab="rrg">Sector Rotation</button>
     <button class="tab-btn" data-tab="drawdown">Drawdown Tracker</button>
     <button class="tab-btn" data-tab="ask">Ask</button>
+    <button class="tab-btn" data-tab="pmnote">PM Note</button>
   </div>
 
   <div class="panel active" id="panel-focus">
@@ -681,6 +722,12 @@
     <div class="ask-answer-box" id="askAnswerBox" style="display:none;"></div>
   </div>
 
+  <div class="panel" id="panel-pmnote">
+    <div id="pmNoteContent">
+      <div class="empty-state">Loading PM Note...</div>
+    </div>
+  </div>
+
   <!-- Shared ticker chart detail view -- NOT a .panel, so tab-switching CSS
        doesn't touch it. Any tab can open this (see openTickerChart()); it
        always hides whichever panel was active and restores it on "Back". -->
@@ -702,6 +749,7 @@
 const DATA_URL = "https://raw.githubusercontent.com/zeeshan141188-hash/india-equity-dashboard-output/main/latest.json";
 const QA_URL = DATA_URL.replace("latest.json", "qa.json");
 const PRICE_SERIES_URL = DATA_URL.replace("latest.json", "price_series.json");
+const PM_SUMMARY_URL = DATA_URL.replace("latest.json", "pm_summary.json");
 
 // How many rows to show when a specific sector is selected in the Focus
 // Screen filter -- mirrors BQNT's "Top 10: {Sector}" drill-down, kept at 5
@@ -869,6 +917,51 @@ async function loadPriceSeries(){
   }catch(err){
     priceSeriesData = {};
   }
+}
+
+// Loaded independently of every other tab -- a missing/failed pm_summary.json
+// (e.g. before the first successful run after wiring this in, or on a day
+// the Gemini call failed) shows a graceful empty-state here only, and never
+// blocks any other tab from working. Same pattern as loadQA()/loadPriceSeries().
+async function loadPMNote(){
+  const container = document.getElementById("pmNoteContent");
+  try{
+    const res = await fetch(PM_SUMMARY_URL, {cache: "no-store"});
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const note = await res.json();
+    renderPMNote(note);
+  }catch(err){
+    container.innerHTML = `<div class="empty-state">PM Note not available yet — ${err.message}</div>`;
+  }
+}
+
+function renderPMNote(note){
+  const container = document.getElementById("pmNoteContent");
+
+  const genDate = note.generated_at
+    ? new Date(note.generated_at).toLocaleString("en-GB", {
+        day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+      })
+    : "—";
+
+  const sections = [
+    { label: "Breadth", body: note.breadth_commentary },
+    { label: "Sector Leadership", body: note.sector_leadership },
+    { label: "Sector Laggards", body: note.sector_laggards },
+    { label: "Notable Setups", body: note.notable_setups },
+    { label: "Levels to Watch", body: note.levels_to_watch },
+  ];
+
+  container.innerHTML = `
+    <div class="pmnote-headline">${note.headline || "—"}</div>
+    <div class="pmnote-meta">Generated ${genDate} · for run date ${note.source_run_date || "—"}</div>
+    ${sections.map(s => s.body ? `
+      <div class="pmnote-section">
+        <div class="pmnote-section-label">${s.label}</div>
+        <div class="pmnote-section-body">${s.body}</div>
+      </div>
+    ` : "").join("")}
+  `;
 }
 
 function sortRows(rows, sortState){
@@ -1085,21 +1178,8 @@ function sortAndRenderDrawdown(){
   `).join("");
 }
 
-// Any tab can call openTickerChart(ticker): it hides whichever panel is
-// currently active, shows the shared #tickerChartView, and renders a
-// single static Close/EMA12/EMA26 line chart from priceSeriesData --
-// whatever point count the backend resolved (270 or 180 trading days)
-// for that ticker. "Back" always restores the panel that opened it, so
-// Focus Screen -> back to list, Displacement -> back to Up/Down tables,
-// etc., without any tab-specific chart-view code.
-
 let chartReturnPanelId = null;
 
-// Looks across every dataset currently loaded for a Name/Sector to show
-// under the ticker in the chart header. Focus Screen rows carry a Name;
-// Displacement/RRG/Conviction rows don't, so those charts show just the
-// sector (or sub-sector, where that's the only field available -- see
-// the Theme and Sub-Sector Conviction branches below).
 function findTickerMeta(ticker){
   const inFocus = focusData.find(r => r.Ticker === ticker);
   if(inFocus) return { name: inFocus.Name, sector: inFocus.Sector };
@@ -1113,30 +1193,14 @@ function findTickerMeta(ticker){
     if((sub.Top_Stocks || []).some(s => s.Ticker === ticker)) return { name: null, sector: sub.Sector };
   }
   const inConv = convData.find(r => r.top_stock === ticker);
-  // Sub-Sector Conviction rows use lowercase `sector` (see sortAndRenderConv) --
-  // deliberately matching the field name as-is rather than normalizing it here.
   if(inConv) return { name: null, sector: inConv.sector };
   const inTheme = themeData.find(t => t.Lead_Stock === ticker);
-  // Theme rows don't carry a Sector field at all (only Sub_Sector -- see
-  // getSectorForSubSector() for why), so fall back to the sub-sector name
-  // itself rather than showing a blank subtitle.
   if(inTheme) return { name: null, sector: inTheme.Sub_Sector };
   const inDrawdown = drawdownData.find(r => r.ID === ticker);
   if(inDrawdown) return { name: null, sector: inDrawdown.Sector };
   return { name: null, sector: null };
 }
 
-// BUG FIX (found while wiring the Theme chart click-through): theme
-// entries from theme_conviction.themes carry Sub_Sector but never a
-// Sector field -- confirmed against the actual API payload, not assumed.
-// The Theme sector-filter dropdown (populateThemeSectorFilter, below)
-// was built earlier assuming r.Sector existed on theme rows; it silently
-// didn't, so the dropdown was populating a bogus "undefined (N)" option
-// and the filter matched nothing for any real sector name. This derives
-// Sector by looking up the same Sub_Sector name in RRG data first (it
-// has the widest sub-sector coverage of any dataset we load), falling
-// back to Focus Screen / Displacement data, both of which also carry
-// both fields on every row.
 function getSectorForSubSector(subSector){
   const inRRG = rrgData.find(r => r.Sub_Sector === subSector);
   if(inRRG) return inRRG.Sector;
@@ -1187,8 +1251,6 @@ function renderTickerChart(){
     return;
   }
 
-  // A previous ticker with no data may have replaced the canvas with an
-  // empty-state div above -- restore it before drawing.
   if(!document.getElementById("tickerChart")){
     wrap.innerHTML = '<canvas id="tickerChart"></canvas>';
   }
@@ -1222,9 +1284,6 @@ function renderTickerChart(){
   note.textContent = `${series.dates.length} trading days shown · ${series.dates[0]} to ${series.dates[series.dates.length - 1]}`;
 }
 
-// Delegated click handlers -- one pair per clickable table/card container.
-// Each just needs data-ticker on its rows/cards (added in the relevant
-// render function) and calls the same shared openTickerChart().
 document.getElementById("focusBody").addEventListener("click", (e)=>{
   const row = e.target.closest("tr[data-ticker]");
   if(!row) return;
@@ -1272,12 +1331,6 @@ document.getElementById("drawdownCards").addEventListener("click", (e)=>{
   openTickerChart(card.dataset.ticker);
 });
 
-// Single global handler for the .ticker-link pattern (single-cell-clickable
-// ticker references inside an otherwise non-stock row: Theme Conviction's
-// Lead_Stock, Sub-Sector Conviction's top_stock, Displacement's own Sector
-// Conviction Top_Horse). Registered once on `document` rather than per
-// container -- every current and future .ticker-link is covered
-// automatically, with no new listener needed when another tab gets one.
 document.addEventListener("click", (e)=>{
   const link = e.target.closest(".ticker-link[data-ticker]");
   if(!link) return;
@@ -1495,13 +1548,6 @@ function sortAndRenderTheme(){
   `).join("");
 }
 
-// .ticker-link click handling is registered once, globally -- see the
-// single document-level listener near the other chart-view wiring below.
-// (Theme's Lead_Stock, Sub-Sector Conviction's top_stock, and
-// Displacement's own Sector Conviction Top_Horse all use this same
-// single-cell-clickable pattern, since each of those rows represents an
-// aggregate -- sub-sector or sector -- not an individual stock.)
-
 function highBadges(r){
   const b13 = r.is_13w_high ? "active" : "";
   const b26 = r.is_26w_high ? "active" : "";
@@ -1620,14 +1666,6 @@ function sortAndRenderRRG(){
 }
 
 document.getElementById("rrgBody").addEventListener("click", (e)=>{
-  // Stock-level click (a row inside an expanded sub-sector's Top_Stocks
-  // detail table) is checked FIRST, since those rows sit nested inside
-  // the section row's rendered output. closest() starts at the actual
-  // click target and walks outward, so a click on a stock row matches
-  // "tr[data-ticker]" immediately -- the outer .rrg-row (which carries
-  // data-subsector, never data-ticker) is only reached, and only
-  // matches, when the click was NOT on a stock row. No stopPropagation
-  // needed: the two selectors are mutually exclusive by construction.
   const stockRow = e.target.closest("tr[data-ticker]");
   if(stockRow){
     openTickerChart(stockRow.dataset.ticker);
@@ -1643,12 +1681,6 @@ document.getElementById("rrgBody").addEventListener("click", (e)=>{
 });
 
 document.getElementById("rrgCards").addEventListener("click", (e)=>{
-  // Same precedence logic as rrgBody above: a stock row click is checked
-  // first. In the card layout these are structurally separate anyway
-  // (.card-stock-row sits inside .card-top-stocks, never inside the
-  // toggle <button>), so this ordering is a formality here rather than
-  // a strict requirement -- but keeping it consistent with the table
-  // handler avoids having to remember two different conventions.
   const stockRow = e.target.closest(".card-stock-row[data-ticker]");
   if(stockRow){
     openTickerChart(stockRow.dataset.ticker);
@@ -1736,10 +1768,6 @@ function renderRRGChart(chartSeries, rebaseDate, asOfWeek){
 
 document.querySelectorAll(".tab-btn").forEach(btn=>{
   btn.addEventListener("click", ()=>{
-    // If the chart view is open, switching tabs directly (rather than
-    // clicking "Back") should still leave things in a consistent state --
-    // close it first so we don't end up with the chart floating over the
-    // wrong tab, or a hidden panel never getting reactivated.
     if(document.getElementById("tickerChartView").style.display !== "none"){
       closeTickerChart();
     }
@@ -1827,10 +1855,10 @@ document.querySelectorAll("#drawdownTable thead th").forEach(th=>{
   const btn = document.getElementById("update-btn");
   const status = document.getElementById("update-status");
   const ENDPOINT = "/api/trigger-refresh";
-  const POLL_INTERVAL_MS = 20000;   // 20s between checks
-  const POLL_MAX_ATTEMPTS = 45;     // 45 * 20s = 15 min ceiling, comfortably above the slowest observed run (~9m30s) plus dispatch latency
+  const POLL_INTERVAL_MS = 20000;
+  const POLL_MAX_ATTEMPTS = 45;
 
-  let lastKnownRunStamp = null;   // run_date_display value seen before the current trigger
+  let lastKnownRunStamp = null;
   let pollTimer = null;
   let pollAttempts = 0;
   let remainingAfterTrigger = null;
@@ -1843,7 +1871,6 @@ document.querySelectorAll("#drawdownTable thead th").forEach(th=>{
   }
 
   async function fetchCurrentRunStamp(){
-    // Independent of loadData() so a failure here never blocks the main dashboard fetch.
     const res = await fetch(DATA_URL, { cache: "no-store" });
     if(!res.ok) throw new Error("HTTP " + res.status);
     const json = await res.json();
@@ -1859,30 +1886,21 @@ document.querySelectorAll("#drawdownTable thead th").forEach(th=>{
   }
 
   function pollForCompletion(){
-    stopPolling(); // cancel any previous poll loop before starting a new one
+    stopPolling();
 
     const tick = async () => {
       pollAttempts++;
       try{
         const currentStamp = await fetchCurrentRunStamp();
         if(currentStamp && currentStamp !== lastKnownRunStamp){
-          // New data has landed — refresh every panel AND every other data
-          // source the page loaded at startup. loadData() alone used to be
-          // called here, which left the Ask tab (qaData) and chart data
-          // (priceSeriesData) silently stale after clicking Update: the
-          // tables/scanners would show the new run, but Q&A answers and
-          // ticker charts would still reflect whatever loaded when the
-          // page first opened, until a manual browser refresh.
           status.textContent = `Done — data updated (${currentStamp}). Refreshing view...`;
-          await Promise.all([loadData(), loadQA(), loadPriceSeries()]);
-          renderAskButtons(); // qaData just changed; re-render the question list so new/changed questions show up
+          await Promise.all([loadData(), loadQA(), loadPriceSeries(), loadPMNote()]);
+          renderAskButtons();
           status.textContent = `Done — data updated (${currentStamp}). ${remainingAfterTrigger}/${limitAfterTrigger} left today.`;
           btn.disabled = remainingAfterTrigger <= 0;
-          return; // stop polling, we're done
+          return;
         }
       }catch(e){
-        // A single failed poll (transient network blip) shouldn't kill the whole wait —
-        // just skip this tick and try again on the next one.
       }
 
       if(pollAttempts >= POLL_MAX_ATTEMPTS){
@@ -1914,12 +1932,10 @@ document.querySelectorAll("#drawdownTable thead th").forEach(th=>{
     btn.textContent = "Triggering...";
     status.textContent = "";
 
-    // Capture the baseline BEFORE dispatching, so we have something correct
-    // to compare against even if the run finishes unusually fast.
     try{
       lastKnownRunStamp = await fetchCurrentRunStamp();
     }catch(e){
-      lastKnownRunStamp = null; // fall back gracefully; worst case we just wait for any non-null stamp
+      lastKnownRunStamp = null;
     }
 
     try{
@@ -1934,7 +1950,7 @@ document.querySelectorAll("#drawdownTable thead th").forEach(th=>{
       remainingAfterTrigger = data.remaining;
       limitAfterTrigger = data.limit;
       btn.textContent = "Update";
-      btn.disabled = true; // stays disabled while we wait, even if refreshes remain — avoids double-triggers mid-poll
+      btn.disabled = true;
       status.textContent = `Triggered. Waiting for it to finish (usually 7-9 min)...`;
 
       pollForCompletion();
@@ -1952,6 +1968,7 @@ document.querySelectorAll("#drawdownTable thead th").forEach(th=>{
 loadData();
 loadQA();
 loadPriceSeries();
+loadPMNote();
 </script>
 </body>
 </html>
