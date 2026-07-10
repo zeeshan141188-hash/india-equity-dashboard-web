@@ -31,6 +31,7 @@ const REPO = "india-equity-dashboard";              // private repo -- feedback 
 const OUTPUT_REPO = "india-equity-dashboard-output"; // public repo -- today's data lives here
 const LOG_PATH = "data/pm_feedback_log.json";
 const GEMINI_MODEL = "gemini-flash-latest";
+const GEMINI_FALLBACK_MODEL = "gemini-flash-lite-latest";
 
 const GITHUB_API = "https://api.github.com";
 const RAW_BASE = `https://raw.githubusercontent.com/${OWNER}/${OUTPUT_REPO}/main`;
@@ -130,8 +131,6 @@ async function callGeminiComparison(pmFeedback, pmNote, latestSummary) {
     `Today's PM Note (already generated from the screening data):\n${JSON.stringify(pmNote, null, 2)}\n\n` +
     `Supporting context (today's run status):\n${JSON.stringify(latestSummary, null, 2)}`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
-
   const requestBody = JSON.stringify({
     contents: [{ parts: [{ text: prompt }] }],
     systemInstruction: { parts: [{ text: COMPARISON_SYSTEM_INSTRUCTIONS }] },
@@ -143,42 +142,55 @@ async function callGeminiComparison(pmFeedback, pmNote, latestSummary) {
     },
   });
 
-  // Google's free-tier Gemini models occasionally return 503 "high demand"
-  // errors that are almost always transient (resolve within seconds). This
-  // is a live user-facing action (unlike daily_screen.py's Step 6, which
-  // can just skip a day silently), so rather than surface a raw 503 to the
-  // PM and make them manually retry, retry automatically here first with a
-  // short backoff. 3 attempts total, ~1.5s then ~3s between them.
-  const MAX_ATTEMPTS = 3;
-  let lastError = null;
+  // Google's free-tier Gemini models periodically hit genuine capacity
+  // limits (well-documented, not specific to this project -- 503 "high
+  // demand" errors are widely reported across many Gemini integrations,
+  // sometimes for sustained periods, not just a few-second blip). This is
+  // a live user-facing action (unlike daily_screen.py's Step 6, which can
+  // just skip a day silently), so this uses a two-layer defense:
+  //   1. Retry the primary model a couple of times with backoff, in case
+  //      it IS just a few-second blip.
+  //   2. If it's still overloaded after that, fall back once to the
+  //      "Lite" variant, which generally sees less traffic and recovers
+  //      faster during the primary model's peak-demand windows -- the
+  //      fix multiple independent sources converge on for this exact error.
+  async function attempt(model, maxAttempts) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    let lastError = null;
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody,
-    });
+    for (let i = 1; i <= maxAttempts; i++) {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: requestBody,
+      });
 
-    if (res.ok) {
-      const data = await res.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) throw new Error("Gemini returned no text content");
-      return JSON.parse(text);
+      if (res.ok) {
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) throw new Error(`${model} returned no text content`);
+        return JSON.parse(text);
+      }
+
+      const bodyText = await res.text();
+      lastError = new Error(`Gemini API error (${model}): ${res.status} ${bodyText}`);
+
+      // Only retry/fall back on 503 -- anything else (bad key, bad
+      // request, quota exhausted) won't be fixed by waiting or switching
+      // models, so fail fast in those cases.
+      if (res.status !== 503) throw lastError;
+      if (i < maxAttempts) await new Promise(r => setTimeout(r, i * 1500));
     }
 
-    const bodyText = await res.text();
-    lastError = new Error(`Gemini API error: ${res.status} ${bodyText}`);
-
-    // Only retry on 503 (overloaded) -- anything else (bad key, bad
-    // request, quota exhausted) won't be fixed by waiting, so fail fast.
-    if (res.status !== 503 || attempt === MAX_ATTEMPTS) {
-      throw lastError;
-    }
-
-    await new Promise(r => setTimeout(r, attempt * 1500));
+    throw lastError;
   }
 
-  throw lastError;
+  try {
+    return await attempt(GEMINI_MODEL, 2);
+  } catch (err) {
+    if (!String(err.message).includes("503")) throw err;
+    return await attempt(GEMINI_FALLBACK_MODEL, 1);
+  }
 }
 
 export default async function handler(req, res) {
