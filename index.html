@@ -898,6 +898,7 @@
       <span class="fin-dropdown-current" id="finMetricCurrent"></span>
     </div>
     <div class="chart-wrap" style="margin-bottom:24px;"><canvas id="finHealthChart"></canvas></div>
+    <div class="cards" id="finHealthCards" style="margin-bottom:24px;"></div>
 
     <div class="disp-subhead">Top 10 Ideas — Composite Score (50% POC Breakout + 50% PM Focus Screen) · Click a row for chart</div>
     <table id="finIdeasTable">
@@ -917,6 +918,7 @@
       </thead>
       <tbody id="finIdeasBody"></tbody>
     </table>
+    <div class="cards" id="finIdeasCards"></div>
 
     <div class="disp-subhead">Theme Conviction — click a theme for its stocks · click RS Ratio for trend</div>
     <table id="finThemeTable">
@@ -936,6 +938,7 @@
       </thead>
       <tbody id="finThemeBody"></tbody>
     </table>
+    <div class="cards" id="finThemeCards"></div>
 
   </div>
 
@@ -2358,11 +2361,21 @@ async function loadFinancialsData(){
     renderFinScoreBox();
     populateFinMetricSelect();
     renderFinHealthChart(document.getElementById("finMetricSelect").value);
+    renderFinHealthCards();
     renderFinIdeasTable();
     renderFinThemeTable();
   }catch(err){
     document.getElementById("finScoreCommentary").textContent = `Could not load India Financials data: ${err.message}`;
   }
+}
+
+function valueAtOffset(arr, offsetFromEnd){
+  const idx = arr.length - 1 - offsetFromEnd;
+  return idx >= 0 ? arr[idx] : null;
+}
+function fmtFin(n, suffix=""){
+  if(n === null || n === undefined || isNaN(n)) return "—";
+  return Number(n).toFixed(1) + suffix;
 }
 
 // ---- Table 1: Composite Sector Score ----
@@ -2464,11 +2477,15 @@ function sortFinRows(rows, sortState){
 
 function renderFinIdeasTable(){
   const body = document.getElementById("finIdeasBody");
+  const cardsEl = document.getElementById("finIdeasCards");
+
   if(!finIdeasData || !finIdeasData.ideas || !finIdeasData.ideas.length){
     body.innerHTML = `<tr><td colspan="10" class="empty-state">No composite ideas data available.</td></tr>`;
+    cardsEl.innerHTML = `<div class="empty-state">No composite ideas data available.</div>`;
     return;
   }
   const rows = sortFinRows(finIdeasData.ideas, finIdeasSort);
+
   body.innerHTML = rows.map(r => `
     <tr class="fin-table-row-clickable" data-ticker="${r.Ticker}">
       <td class="ticker">${cleanTicker(r.Ticker)}<span class="name-sub">${r.Name||""}</span></td>
@@ -2482,6 +2499,28 @@ function renderFinIdeasTable(){
       <td><span class="tag ${r.Value_Discovery ? 'Yes' : 'No'}">${r.Value_Discovery ? 'Yes' : 'No'}</span></td>
       <td class="num score-cell">${fmt(r.Composite_Score,1)}</td>
     </tr>`).join("");
+
+  cardsEl.innerHTML = rows.map(r => `
+    <div class="card fin-table-row-clickable" data-ticker="${r.Ticker}">
+      <div class="card-top">
+        <div>
+          <div class="card-ticker">${cleanTicker(r.Ticker)}</div>
+          <div class="card-name">${r.Theme||""} · <span class="tag ${r.Value_Discovery ? 'Yes' : 'No'}">${r.Value_Discovery ? 'Discovery' : 'No Discovery'}</span></div>
+        </div>
+        <div>
+          <div class="card-score">${fmt(r.Composite_Score,1)}</div>
+          <div class="card-score-label">Composite</div>
+        </div>
+      </div>
+      <div class="card-meta">
+        <span>Price <b>₹${fmt(r.Price)}</b></span>
+        <span>Ratio <b>${fmt(r.Ratio,3)}</b></span>
+        <span>Trend <b>${fmt(r.TrendQuality,3)}</b></span>
+        <span>Absorption <b>${fmt(r.Absorption,3)}</b></span>
+        <span>Follow-Thru <b>${fmt(r.FollowThrough,3)}</b></span>
+        <span>POC Score <b>${fmt(r.POC_Score,1)}</b></span>
+      </div>
+    </div>`).join("");
 }
 
 document.querySelectorAll("#finIdeasTable thead th").forEach(th => {
@@ -2499,7 +2538,13 @@ document.getElementById("finIdeasBody").addEventListener("click", (e) => {
   openTickerChart(row.dataset.ticker);
 });
 
-// ---- Table 3: Theme Conviction (unchanged from v3) ----
+document.getElementById("finIdeasCards").addEventListener("click", (e) => {
+  const card = e.target.closest(".card[data-ticker]");
+  if(!card) return;
+  openTickerChart(card.dataset.ticker);
+});
+
+// ---- Table 3: Theme Conviction ----
 let finThemeRows = [];
 let finThemeSort = { key: "Conviction", dir: -1 };
 
@@ -2556,6 +2601,40 @@ function renderFinThemeTable(){
     const detailRow = isOpen ? `
       <tr class="fin-theme-detail-row"><td colspan="10">${renderThemeStockDetail(r.Theme)}</td></tr>` : "";
     return mainRow + detailRow;
+  }).join("");
+
+  document.getElementById("finThemeCards").innerHTML = sorted.map(r => {
+    const isOpen = finThemeExpanded.has(r.Theme);
+    const stocks = (finThemeData && finThemeData.stocks_by_theme[r.Theme]) || [];
+    const stocksHtml = stocks.map(s => `
+      <div class="card-stock-row" data-ticker="${s.Ticker}">
+        <span class="cs-ticker">${cleanTicker(s.Ticker)}</span>
+        <span class="cs-meta">₹${fmt(s.Price)} · PM ${fmt(s.PM_Score,2)} · ${s.Structural_Level!=="None"?s.Structural_Level:"—"}</span>
+      </div>`).join("");
+    return `
+      <div class="card">
+        <div class="card-top">
+          <div>
+            <div class="card-ticker">${r.Theme}</div>
+            <div class="card-name">${r.n_stocks} stocks · <span class="tag ${r.Driver}">${r.Driver}</span> driven · lead: <span class="ticker-link" data-ticker="${r.Lead_Stock||''}">${r.Lead_Stock?cleanTicker(r.Lead_Stock):"—"}</span></div>
+          </div>
+          <div>
+            <div class="card-score">${r.Conviction!==null?r.Conviction.toFixed(1):"—"}</div>
+            <div class="card-score-label">Conviction</div>
+          </div>
+        </div>
+        <div class="pillar-bars">
+          <div class="pillar-bar" title="Momentum ${r.Momentum}"><div class="pillar-bar-fill momentum" style="width:${Math.min(r.Momentum||0,100)}%"></div></div>
+          <div class="pillar-bar" title="Structure ${r.Structure}"><div class="pillar-bar-fill persistence" style="width:${Math.min(r.Structure||0,100)}%"></div></div>
+          <div class="pillar-bar" title="Activation ${r.Activation}"><div class="pillar-bar-fill expansion" style="width:${Math.min(r.Activation||0,100)}%"></div></div>
+          <div class="pillar-bar" title="DQ ${r.DQ}"><div class="pillar-bar-fill dq" style="width:${Math.min(r.DQ||0,100)}%"></div></div>
+        </div>
+        <div class="card-meta" style="margin-top:8px;">
+          <span>RS Ratio <b>${r.rs_ratio!==null?r.rs_ratio.toFixed(3):"—"}</b></span>
+        </div>
+        <button class="card-toggle-btn" data-subsector-toggle="${r.Theme}">Show stocks</button>
+        <div class="card-top-stocks ${isOpen ? 'open' : ''}" data-subsector-list="${r.Theme}">${stocksHtml}</div>
+      </div>`;
   }).join("");
 }
 
@@ -2620,6 +2699,23 @@ document.getElementById("finThemeBody").addEventListener("click", (e) => {
   renderFinThemeTable();
 });
 
+document.getElementById("finThemeCards").addEventListener("click", (e) => {
+  const stockRow = e.target.closest(".card-stock-row[data-ticker]");
+  if(stockRow){ openTickerChart(stockRow.dataset.ticker); return; }
+
+  const link = e.target.closest(".ticker-link[data-ticker]");
+  if(link && link.dataset.ticker){ openTickerChart(link.dataset.ticker); return; }
+
+  const btn = e.target.closest("[data-subsector-toggle]");
+  if(btn){
+    const key = btn.dataset.subsectorToggle;
+    if(finThemeExpanded.has(key)) finThemeExpanded.delete(key);
+    else finThemeExpanded.add(key);
+    renderFinThemeTable();
+    return;
+  }
+});
+
 // ---- Chart drill-down (theme RS ratio) ----
 function openFinThemeRatioChart(themeName){
   const row = finThemeRows.find(r => r.Theme === themeName);
@@ -2645,6 +2741,32 @@ function closeFinChart(){
   document.getElementById("finChartView").style.display = "none";
   document.getElementById("finGridView").style.display = "block";
   if(finChartInstance){ finChartInstance.destroy(); finChartInstance = null; }
+}
+
+// ---- Table 1's Sector Health mobile cards ----
+function renderFinHealthCards(){
+  document.getElementById("finHealthCards").innerHTML = Object.keys(FIN_METRIC_LABELS).map(key => {
+    const series = finHealthData.metrics[key] || [];
+    return `
+      <div class="card fin-table-row-clickable" data-metric="${key}">
+        <div class="card-top">
+          <div class="card-ticker">${FIN_METRIC_LABELS[key]}</div>
+          <div class="card-score">${fmtFin(valueAtOffset(series,0),"%")}</div>
+        </div>
+      </div>`;
+  }).join("");
+}
+document.getElementById("finHealthCards")?.addEventListener("click", (e) => {
+  const card = e.target.closest(".card[data-metric]");
+  if(!card) return;
+  openFinMetricChart(card.dataset.metric);
+});
+
+// ---- Chart drill-down (metric) ----
+function openFinMetricChart(key){
+  const series = finHealthData.metrics[key];
+  if(!series) return;
+  showFinChart(FIN_METRIC_LABELS[key], "Sector Health · 135 stocks · 1-year", finHealthData.dates, series, "%");
 }
 
 loadFinancialsData();
