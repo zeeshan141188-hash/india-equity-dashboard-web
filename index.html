@@ -602,25 +602,15 @@
   .chart-ticker-sub{color:var(--sub);font-size:13px;margin-top:2px;}
 
   .chart-legend-note{font-size:12px;color:var(--sub);margin-top:10px;}
-  .fin-bmrk-tile{
-    background:var(--card);
-    border:1px solid var(--line);
-    border-radius:var(--radius);
-    padding:16px 18px;
-    margin-bottom:16px;
-    cursor:pointer;
-    transition:border-color 0.15s;
-  }
-  .fin-bmrk-tile:hover{border-color:var(--ink);}
-  .fin-bmrk-title{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;}
-  .fin-bmrk-sub{color:var(--sub);font-size:12px;margin-top:2px;}
-  .fin-bmrk-val{font-family:'IBM Plex Mono',monospace;font-size:20px;margin-top:6px;}
-  .fin-theme-grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));
+    .fin-summary-row{
+    display:flex;
     gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:20px;
   }
-  .fin-theme-tile{
+  .fin-summary-stat{
+    flex:1;
+    min-width:140px;
     background:var(--card);
     border:1px solid var(--line);
     border-radius:var(--radius);
@@ -628,12 +618,15 @@
     cursor:pointer;
     transition:border-color 0.15s;
   }
-  .fin-theme-tile:hover{border-color:var(--ink);}
-  .fin-theme-name{font-size:13px;font-weight:600;}
-  .fin-theme-meta{color:var(--sub);font-size:11.5px;margin-top:3px;}
-  .fin-theme-val{font-family:'IBM Plex Mono',monospace;font-size:15px;margin-top:6px;}
-  .fin-theme-val.up{color:var(--teal);}
-  .fin-theme-val.down{color:var(--err);}
+  .fin-summary-stat:hover{border-color:var(--ink);}
+  .fin-summary-stat-label{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:0.03em;}
+  .fin-summary-stat-val{font-family:'IBM Plex Mono',monospace;font-size:19px;margin-top:4px;}
+  .fin-summary-stat-val.pos{color:var(--teal);}
+  .fin-summary-stat-val.neg{color:var(--err);}
+
+  .fin-table-row-clickable{cursor:pointer;}
+  .fin-table-row-clickable:hover{background:#F5F6F4;}
+
   #panel-financials .chart-wrap{height:320px;margin-top:14px;}
   .fin-chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
   .fin-back-btn{
@@ -641,6 +634,8 @@
     padding:6px 12px;font-size:12px;cursor:pointer;color:var(--ink);
   }
   .fin-back-btn:hover{border-color:var(--ink);}
+  .fin-val-pos{color:var(--teal);}
+  .fin-val-neg{color:var(--err);}
 </style>
 </head>
 <body>
@@ -881,22 +876,44 @@
   <div class="panel" id="panel-financials">
 
   <div id="finGridView">
-    <div class="fin-bmrk-tile" id="finBmrkTile">
-      <div class="fin-bmrk-title">India_Financials_Bmrk</div>
-      <div class="fin-bmrk-sub" id="finBmrkMeta">Loading…</div>
-      <div class="fin-bmrk-val" id="finBmrkVal">—</div>
+
+    <div class="fin-summary-row" id="finSummaryRow">
+      <!-- injected by JS -->
     </div>
 
-    <div class="fin-theme-grid" id="finThemeGrid">
-      <!-- theme tiles injected by JS -->
-    </div>
+    <div class="disp-subhead">Sector Health — India Financials (135 stocks, equal-weight) · Click a metric for 1-year trend</div>
+    <table id="finHealthTable">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th class="num">Today</th>
+          <th class="num">1 Month Ago</th>
+          <th class="num">3 Months Ago</th>
+        </tr>
+      </thead>
+      <tbody id="finHealthBody"></tbody>
+    </table>
+
+    <div class="disp-subhead">Thematic Ranking — vs India_Financials_Bmrk · Click a row for RS ratio trend</div>
+    <table id="finThemeTable">
+      <thead>
+        <tr>
+          <th data-key="theme">Theme</th>
+          <th data-key="n_stocks" class="num">Stocks</th>
+          <th data-key="rs_ratio" class="num">RS Ratio</th>
+          <th data-key="index_chg_1y" class="num">1y Return</th>
+        </tr>
+      </thead>
+      <tbody id="finThemeBody"></tbody>
+    </table>
+
   </div>
 
   <div id="finChartView" style="display:none;">
     <div class="fin-chart-header">
       <div>
-        <div class="fin-bmrk-title" id="finChartTitle">—</div>
-        <div class="fin-bmrk-sub" id="finChartSub"></div>
+        <div class="fin-bmrk-title" id="finChartTitle" style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;">—</div>
+        <div class="fin-bmrk-sub" id="finChartSub" style="color:var(--sub);font-size:12px;margin-top:2px;"></div>
       </div>
       <button class="fin-back-btn" onclick="closeFinChart()">← Back</button>
     </div>
@@ -2260,84 +2277,208 @@ const FINANCIALS_URL = DATA_URL.replace(
   "india-equity-dashboard-output/main/latest.json",
   "india-thematics-output/main/financials_baskets.json"
 );
-// If your India Thematics output repo has a different name, just edit the
-// string above directly, e.g.:
-// const FINANCIALS_URL = "https://raw.githubusercontent.com/<you>/india-thematics-output/main/financials_baskets.json";
+const SECTOR_HEALTH_URL = FINANCIALS_URL.replace("financials_baskets.json", "financials_sector_health.json");
 
 let finData = null;
+let finHealthData = null;
 let finChartInstance = null;
+
+const FIN_METRIC_LABELS = {
+  pct_above_50dma:   "% Above 50DMA",
+  pct_above_200dma:  "% Above 200DMA",
+  pct_new_high_13w:  "% at 13w High",
+  pct_new_high_26w:  "% at 26w High",
+  pct_new_high_52w:  "% at 52w High",
+  pct_new_low_13w:   "% at 13w Low",
+  pct_new_low_26w:   "% at 26w Low",
+  pct_new_low_52w:   "% at 52w Low",
+  pct_volume_expansion: "% Volume Expansion",
+  adv_dec_pct:       "Advance/Decline %",
+};
+const FIN_SUMMARY_KEYS = ["pct_above_200dma", "pct_new_high_52w", "pct_new_low_52w", "adv_dec_pct"];
 
 async function loadFinancialsData(){
   try{
-    const res = await fetch(FINANCIALS_URL, {cache: "no-store"});
-    if(!res.ok) throw new Error(`HTTP ${res.status}`);
-    finData = await res.json();
-    renderFinancialsGrid();
+    const [basketsRes, healthRes] = await Promise.all([
+      fetch(FINANCIALS_URL, {cache: "no-store"}),
+      fetch(SECTOR_HEALTH_URL, {cache: "no-store"}),
+    ]);
+    if(!basketsRes.ok) throw new Error(`baskets HTTP ${basketsRes.status}`);
+    if(!healthRes.ok) throw new Error(`sector health HTTP ${healthRes.status}`);
+    finData = await basketsRes.json();
+    finHealthData = await healthRes.json();
+    renderFinSummary();
+    renderFinHealthTable();
+    renderFinThemeTable();
   }catch(err){
-    document.getElementById("finBmrkMeta").textContent = "Data not available yet";
-    document.getElementById("finThemeGrid").innerHTML =
+    document.getElementById("finSummaryRow").innerHTML =
       `<div class="empty-state">Could not load India Financials data: ${err.message}</div>`;
   }
 }
 
-function pctChange(values){
+function valueAtOffset(arr, offsetFromEnd){
+  const idx = arr.length - 1 - offsetFromEnd;
+  return idx >= 0 ? arr[idx] : null;
+}
+
+function fmtFin(n, suffix=""){
+  if(n === null || n === undefined || isNaN(n)) return "—";
+  return Number(n).toFixed(1) + suffix;
+}
+
+function renderFinSummary(){
+  const row = document.getElementById("finSummaryRow");
+  row.innerHTML = FIN_SUMMARY_KEYS.map(key => {
+    const series = finHealthData.metrics[key] || [];
+    const latest = series[series.length - 1];
+    const isNeg = key.includes("low") && latest > 0;
+    const isPos = (key.includes("high") || key === "pct_above_200dma" || key === "adv_dec_pct") && latest > 0;
+    const cls = key.includes("low") ? "neg" : (key === "adv_dec_pct" ? (latest >= 0 ? "pos" : "neg") : "");
+    return `
+      <div class="fin-summary-stat" data-metric="${key}">
+        <div class="fin-summary-stat-label">${FIN_METRIC_LABELS[key]}</div>
+        <div class="fin-summary-stat-val ${cls}">${fmtFin(latest, key.startsWith("pct") || key === "adv_dec_pct" ? "%" : "")}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderFinHealthTable(){
+  const body = document.getElementById("finHealthBody");
+  const dates = finHealthData.dates;
+
+  // Find index roughly 1 month (21 trading-ish / 30 calendar days) and
+  // 3 months (91 calendar days) back from the end, by date proximity.
+  function findOffsetIndex(daysBack){
+    const targetDate = new Date(dates[dates.length - 1]);
+    targetDate.setDate(targetDate.getDate() - daysBack);
+    const targetStr = targetDate.toISOString().slice(0, 10);
+    let closestIdx = 0, closestDiff = Infinity;
+    dates.forEach((d, i) => {
+      const diff = Math.abs(new Date(d) - new Date(targetStr));
+      if(diff < closestDiff){ closestDiff = diff; closestIdx = i; }
+    });
+    return dates.length - 1 - closestIdx;
+  }
+
+  const offset1m = findOffsetIndex(30);
+  const offset3m = findOffsetIndex(91);
+
+  const rows = Object.keys(FIN_METRIC_LABELS);
+  body.innerHTML = rows.map(key => {
+    const series = finHealthData.metrics[key] || [];
+    const today = valueAtOffset(series, 0);
+    const ago1m = valueAtOffset(series, offset1m);
+    const ago3m = valueAtOffset(series, offset3m);
+    return `
+      <tr class="fin-table-row-clickable" data-metric="${key}">
+        <td class="ticker">${FIN_METRIC_LABELS[key]}</td>
+        <td class="num">${fmtFin(today, "%")}</td>
+        <td class="num">${fmtFin(ago1m, "%")}</td>
+        <td class="num">${fmtFin(ago3m, "%")}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function pctChangeFin(values){
   if(!values || values.length < 2) return null;
   const first = values[0], last = values[values.length - 1];
   if(!first) return null;
   return ((last / first) - 1) * 100;
 }
 
-function renderFinancialsGrid(){
-  if(!finData) return;
+let finThemeRows = [];
+let finThemeSort = { key: "rs_ratio", dir: -1 };
 
-  const b = finData.benchmark;
-  const bChange = pctChange(b.values);
-  document.getElementById("finBmrkMeta").textContent =
-    `${b.n_stocks} stocks, equal-weight · as of ${finData.as_of}`;
-  document.getElementById("finBmrkVal").innerHTML =
-    `${b.values[b.values.length-1]?.toFixed(2) ?? "—"}` +
-    (bChange !== null ? ` <span style="font-size:13px;color:${bChange>=0?'var(--teal)':'var(--err)'}">${bChange>=0?'+':''}${bChange.toFixed(1)}% (1y)</span>` : "");
+function computeThemeRows(){
+  const bDates = finData.benchmark.dates;
+  const bValues = finData.benchmark.values;
+  const bByDate = {};
+  bDates.forEach((d, i) => bByDate[d] = bValues[i]);
 
-  const grid = document.getElementById("finThemeGrid");
-  grid.innerHTML = "";
-
-  const themeNames = Object.keys(finData.themes).sort();
-  for(const name of themeNames){
+  return Object.keys(finData.themes).map(name => {
     const t = finData.themes[name];
-    const change = pctChange(t.values);
-    const lastVal = t.values.length ? t.values[t.values.length-1].toFixed(2) : "—";
-    const tile = document.createElement("div");
-    tile.className = "fin-theme-tile";
-    tile.dataset.theme = name;
-    tile.innerHTML = `
-      <div class="fin-theme-name">${name}</div>
-      <div class="fin-theme-meta">${t.n_stocks} stocks</div>
-      <div class="fin-theme-val ${change!==null ? (change>=0?'up':'down') : ''}">
-        ${lastVal}${change!==null ? ` (${change>=0?'+':''}${change.toFixed(1)}%)` : ''}
-      </div>`;
-    grid.appendChild(tile);
-  }
+    const commonDates = t.dates.filter(d => d in bByDate);
+    const ratioSeries = commonDates.map(d => t.values[t.dates.indexOf(d)] / bByDate[d]);
+    const latestRatio = ratioSeries.length ? ratioSeries[ratioSeries.length - 1] : null;
+    return {
+      theme: name,
+      n_stocks: t.n_stocks,
+      rs_ratio: latestRatio,
+      index_chg_1y: pctChangeFin(t.values),
+      ratio_dates: commonDates,
+      ratio_series: ratioSeries,
+    };
+  });
 }
 
-function openFinChart(key){
-  const series = key === "__benchmark__" ? finData.benchmark : finData.themes[key];
-  if(!series) return;
+function sortFinThemeRows(rows, sortState){
+  const {key, dir} = sortState;
+  return [...rows].sort((a, b) => {
+    const av = a[key], bv = b[key];
+    if(typeof av === "string") return av.localeCompare(bv) * dir;
+    const an = (av === null || av === undefined || isNaN(av)) ? -Infinity : av;
+    const bn = (bv === null || bv === undefined || isNaN(bv)) ? -Infinity : bv;
+    return (an - bn) * dir;
+  });
+}
 
+function renderFinThemeTable(){
+  finThemeRows = computeThemeRows();
+  const sorted = sortFinThemeRows(finThemeRows, finThemeSort);
+  const body = document.getElementById("finThemeBody");
+
+  body.innerHTML = sorted.map(r => `
+    <tr class="fin-table-row-clickable" data-theme="${r.theme}">
+      <td class="ticker">${r.theme}</td>
+      <td class="num">${r.n_stocks}</td>
+      <td class="num">${r.rs_ratio !== null ? r.rs_ratio.toFixed(3) : "—"}</td>
+      <td class="num ${r.index_chg_1y !== null ? (r.index_chg_1y >= 0 ? 'fin-val-pos' : 'fin-val-neg') : ''}">
+        ${r.index_chg_1y !== null ? (r.index_chg_1y >= 0 ? '+' : '') + r.index_chg_1y.toFixed(1) + '%' : '—'}
+      </td>
+    </tr>
+  `).join("");
+}
+
+document.querySelectorAll("#finThemeTable thead th").forEach(th => {
+  th.addEventListener("click", () => {
+    const key = th.dataset.key;
+    finThemeSort.dir = (finThemeSort.key === key) ? -finThemeSort.dir : -1;
+    finThemeSort.key = key;
+    renderFinThemeTable();
+  });
+});
+
+// ---- Chart drill-down: metric (Table 1) or theme RS ratio (Table 2) ----
+function openFinMetricChart(key){
+  const series = finHealthData.metrics[key];
+  if(!series) return;
+  showFinChart(FIN_METRIC_LABELS[key], "Sector Health · 135 stocks, equal-weight · 1-year",
+    finHealthData.dates, series, key.startsWith("pct") || key === "adv_dec_pct" ? "%" : "");
+}
+
+function openFinThemeRatioChart(themeName){
+  const row = finThemeRows.find(r => r.theme === themeName);
+  if(!row || !row.ratio_series.length) return;
+  showFinChart(`${themeName} ÷ India_Financials_Bmrk`, `${row.n_stocks} stocks · RS Ratio · 1-year`,
+    row.ratio_dates, row.ratio_series, "");
+}
+
+function showFinChart(title, sub, dates, values, suffix){
   document.getElementById("finGridView").style.display = "none";
   document.getElementById("finChartView").style.display = "block";
-  document.getElementById("finChartTitle").textContent =
-    key === "__benchmark__" ? "India_Financials_Bmrk" : key;
-  document.getElementById("finChartSub").textContent =
-    `${series.n_stocks} stocks, equal-weight, rebased to 100 · 1-year`;
+  document.getElementById("finChartTitle").textContent = title;
+  document.getElementById("finChartSub").textContent = sub;
 
   if(finChartInstance) finChartInstance.destroy();
   finChartInstance = new Chart(document.getElementById("finChart").getContext("2d"), {
     type: "line",
     data: {
-      labels: series.dates,
+      labels: dates,
       datasets: [{
-        label: key === "__benchmark__" ? "India_Financials_Bmrk" : key,
-        data: series.values,
+        label: title,
+        data: values,
         borderColor: "#14171A",
         backgroundColor: "rgba(20,23,26,0.06)",
         borderWidth: 2,
@@ -2352,7 +2493,7 @@ function openFinChart(key){
       interaction: { mode: "index", intersect: false },
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: (ctx) => `Index: ${ctx.parsed.y.toFixed(2)}` } }
+        tooltip: { callbacks: { label: (ctx) => `${ctx.parsed.y.toFixed(2)}${suffix}` } }
       },
       scales: {
         x: { ticks: { maxTicksLimit: 7, font: { size: 10 } } },
@@ -2368,14 +2509,24 @@ function closeFinChart(){
   if(finChartInstance){ finChartInstance.destroy(); finChartInstance = null; }
 }
 
-document.getElementById("finBmrkTile").addEventListener("click", () => openFinChart("__benchmark__"));
-document.getElementById("finThemeGrid").addEventListener("click", (e) => {
-  const tile = e.target.closest(".fin-theme-tile[data-theme]");
-  if(!tile) return;
-  openFinChart(tile.dataset.theme);
+document.getElementById("finSummaryRow").addEventListener("click", (e) => {
+  const stat = e.target.closest(".fin-summary-stat[data-metric]");
+  if(!stat) return;
+  openFinMetricChart(stat.dataset.metric);
 });
 
-// Kick off load. Call this alongside your existing loadData()/loadPriceSeries() calls.
+document.getElementById("finHealthBody").addEventListener("click", (e) => {
+  const row = e.target.closest("tr[data-metric]");
+  if(!row) return;
+  openFinMetricChart(row.dataset.metric);
+});
+
+document.getElementById("finThemeBody").addEventListener("click", (e) => {
+  const row = e.target.closest("tr[data-theme]");
+  if(!row) return;
+  openFinThemeRatioChart(row.dataset.theme);
+});
+
 loadFinancialsData();
 loadPMNote();
 </script>
