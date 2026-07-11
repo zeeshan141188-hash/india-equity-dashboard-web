@@ -898,8 +898,7 @@
       <span class="fin-dropdown-current" id="finMetricCurrent"></span>
     </div>
     <div class="chart-wrap" style="margin-bottom:24px;"><canvas id="finHealthChart"></canvas></div>
-    <div class="cards" id="finHealthCards" style="margin-bottom:24px;"></div>
-
+    
     <div class="disp-subhead">Top 10 Ideas — Composite Score (50% POC Breakout + 50% PM Focus Screen) · Click a row for chart</div>
     <table id="finIdeasTable">
       <thead>
@@ -2361,7 +2360,6 @@ async function loadFinancialsData(){
     renderFinScoreBox();
     populateFinMetricSelect();
     renderFinHealthChart(document.getElementById("finMetricSelect").value);
-    renderFinHealthCards();
     renderFinIdeasTable();
     renderFinThemeTable();
   }catch(err){
@@ -2742,25 +2740,6 @@ function closeFinChart(){
   document.getElementById("finGridView").style.display = "block";
   if(finChartInstance){ finChartInstance.destroy(); finChartInstance = null; }
 }
-
-// ---- Table 1's Sector Health mobile cards ----
-function renderFinHealthCards(){
-  document.getElementById("finHealthCards").innerHTML = Object.keys(FIN_METRIC_LABELS).map(key => {
-    const series = finHealthData.metrics[key] || [];
-    return `
-      <div class="card fin-table-row-clickable" data-metric="${key}">
-        <div class="card-top">
-          <div class="card-ticker">${FIN_METRIC_LABELS[key]}</div>
-          <div class="card-score">${fmtFin(valueAtOffset(series,0),"%")}</div>
-        </div>
-      </div>`;
-  }).join("");
-}
-document.getElementById("finHealthCards")?.addEventListener("click", (e) => {
-  const card = e.target.closest(".card[data-metric]");
-  if(!card) return;
-  openFinMetricChart(card.dataset.metric);
-});
 
 // ---- Chart drill-down (metric) ----
 function openFinMetricChart(key){
