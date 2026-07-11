@@ -602,21 +602,31 @@
   .chart-ticker-sub{color:var(--sub);font-size:13px;margin-top:2px;}
 
   .chart-legend-note{font-size:12px;color:var(--sub);margin-top:10px;}
-    .fin-summary-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;}
-  .fin-summary-stat{
-    flex:1;min-width:140px;background:var(--card);border:1px solid var(--line);
-    border-radius:var(--radius);padding:12px 14px;cursor:pointer;transition:border-color 0.15s;
+    .fin-score-box{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px;margin-bottom:20px;display:flex;gap:24px;align-items:center;flex-wrap:wrap;
   }
-  .fin-summary-stat:hover{border-color:var(--ink);}
-  .fin-summary-stat-label{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:0.03em;}
-  .fin-summary-stat-val{font-family:'IBM Plex Mono',monospace;font-size:19px;margin-top:4px;}
-  .fin-summary-stat-val.pos{color:var(--teal);}
-  .fin-summary-stat-val.neg{color:var(--err);}
+  .fin-score-badge{
+    font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;
+    padding:6px 16px;border-radius:20px;flex-shrink:0;
+  }
+  .fin-score-badge.bullish{background:var(--teal-bg);color:var(--teal);}
+  .fin-score-badge.bearish{background:#FBE6E3;color:var(--err);}
+  .fin-score-badge.neutral{background:var(--gold-bg);color:var(--gold);}
+  .fin-score-num{font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:600;flex-shrink:0;}
+  .fin-score-commentary{font-size:13.5px;line-height:1.5;color:var(--ink);flex:1;min-width:220px;}
+
+  .fin-dropdown-row{display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+  #finMetricSelect{
+    font-family:'Inter',sans-serif;font-size:13px;padding:7px 10px;border-radius:8px;
+    border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;
+  }
+  .fin-dropdown-current{font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--sub);}
 
   .fin-table-row-clickable{cursor:pointer;}
   .fin-table-row-clickable:hover{background:#F5F6F4;}
 
-  #panel-financials .chart-wrap{height:320px;margin-top:14px;}
+  #panel-financials .chart-wrap{height:320px;margin-top:0;}
   .fin-chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
   .fin-back-btn{
     background:none;border:1px solid var(--line);border-radius:6px;
@@ -632,6 +642,9 @@
 
   .fin-theme-detail-row td{padding:0;background:#FBFBFA;}
   .fin-theme-detail-inner{padding:10px 14px 16px 20px;}
+
+  .tag.Yes{background:var(--teal-bg);color:var(--teal);}
+  .tag.No{background:var(--line);color:var(--sub);}
 </style>
 </head>
 <body>
@@ -873,14 +886,36 @@
 
   <div id="finGridView">
 
-    <div class="fin-summary-row" id="finSummaryRow"></div>
+    <div class="disp-subhead" style="margin-top:0;">Sector Health — India Financials (135 stocks)</div>
+    <div class="fin-score-box">
+      <div class="fin-score-badge" id="finScoreBadge">—</div>
+      <div class="fin-score-num" id="finScoreNum">—</div>
+      <div class="fin-score-commentary" id="finScoreCommentary">Loading…</div>
+    </div>
 
-    <div class="disp-subhead">Sector Health — India Financials (135 stocks) · Click a metric for 1-year trend</div>
-    <table id="finHealthTable">
+    <div class="fin-dropdown-row">
+      <select id="finMetricSelect"></select>
+      <span class="fin-dropdown-current" id="finMetricCurrent"></span>
+    </div>
+    <div class="chart-wrap" style="margin-bottom:24px;"><canvas id="finHealthChart"></canvas></div>
+
+    <div class="disp-subhead">Top 10 Ideas — Composite Score (50% POC Breakout + 50% PM Focus Screen) · Click a row for chart</div>
+    <table id="finIdeasTable">
       <thead>
-        <tr><th>Metric</th><th class="num">Today</th><th class="num">1 Month Ago</th><th class="num">3 Months Ago</th></tr>
+        <tr>
+          <th data-key="Ticker">Ticker</th>
+          <th data-key="Theme">Theme</th>
+          <th data-key="Price" class="num">Price</th>
+          <th data-key="Ratio" class="num">Ratio</th>
+          <th data-key="TrendQuality" class="num">Trend</th>
+          <th data-key="Absorption" class="num">Absorption</th>
+          <th data-key="FollowThrough" class="num">Follow-Thru</th>
+          <th data-key="POC_Score" class="num">POC Score</th>
+          <th data-key="Value_Discovery">Discovery</th>
+          <th data-key="Composite_Score" class="num">Composite</th>
+        </tr>
       </thead>
-      <tbody id="finHealthBody"></tbody>
+      <tbody id="finIdeasBody"></tbody>
     </table>
 
     <div class="disp-subhead">Theme Conviction — click a theme for its stocks · click RS Ratio for trend</div>
@@ -900,25 +935,6 @@
         </tr>
       </thead>
       <tbody id="finThemeBody"></tbody>
-    </table>
-
-    <div class="disp-subhead">Top Ideas — PM Focus Screen (Financials-scoped) · Click a row for chart</div>
-    <table id="finIdeasTable">
-      <thead>
-        <tr>
-          <th data-key="Ticker">Ticker</th>
-          <th data-key="Sub_Sector">Theme</th>
-          <th data-key="Type">Type</th>
-          <th data-key="Price" class="num">Price</th>
-          <th data-key="Ratio" class="num">Ratio</th>
-          <th data-key="BaseDays" class="num">Base Days</th>
-          <th data-key="TrendQuality" class="num">Trend</th>
-          <th data-key="Absorption" class="num">Absorption</th>
-          <th data-key="FollowThrough" class="num">Follow-Thru</th>
-          <th data-key="PM_Score" class="num">PM Score</th>
-        </tr>
-      </thead>
-      <tbody id="finIdeasBody"></tbody>
     </table>
 
   </div>
@@ -1556,7 +1572,13 @@ function closeTickerChart(){
   currentChartTicker = null;
 }
 
-function renderTickerChart(){
+  function alignSeriesToChart(pocSeries, chartDates){
+     const map = {};
+     pocSeries.dates.forEach((d,i) => map[d] = pocSeries.poc_15d[i]);
+     return chartDates.map(d => (d in map) ? map[d] : null);
+   }
+  
+  function renderTickerChart(){
   const wrap = document.querySelector("#tickerChartView .chart-wrap");
   const note = document.getElementById("chartLegendNote");
   const series = priceSeriesData[currentChartTicker] || finPriceSeriesData[currentChartTicker];
@@ -1580,6 +1602,13 @@ function renderTickerChart(){
         { label: "Close", data: series.close, borderColor: "#14171A", backgroundColor: "#14171A", borderWidth: 2, pointRadius: 0, tension: 0.1 },
         { label: "EMA 12", data: series.ema12, borderColor: "#2B6E63", backgroundColor: "#2B6E63", borderWidth: 1.5, pointRadius: 0, tension: 0.1 },
         { label: "EMA 26", data: series.ema26, borderColor: "#5B4B8A", backgroundColor: "#5B4B8A", borderWidth: 1.5, pointRadius: 0, tension: 0.1 },
+        {
+     label: "POC 15D",
+     data: (finPocData && finPocData.series[currentChartTicker]) ?
+       alignSeriesToChart(finPocData.series[currentChartTicker], series.dates) : [],
+     borderColor: "#A8842B", backgroundColor: "#A8842B",
+     borderWidth: 1.5, borderDash: [5,3], pointRadius: 0, tension: 0.1
+   },
       ]
     },
     options: {
@@ -2291,11 +2320,13 @@ const FINANCIALS_URL = DATA_URL.replace(
 );
 const SECTOR_HEALTH_URL = FINANCIALS_URL.replace("financials_baskets.json", "financials_sector_health.json");
 const THEME_CONVICTION_URL = FINANCIALS_URL.replace("financials_baskets.json", "financials_theme_conviction.json");
-const TOP_IDEAS_URL = FINANCIALS_URL.replace("financials_baskets.json", "financials_top_ideas.json");
+const COMPOSITE_IDEAS_URL = FINANCIALS_URL.replace("financials_baskets.json", "financials_composite_ideas.json");
 const FIN_PRICE_SERIES_URL = FINANCIALS_URL.replace("financials_baskets.json", "financials_price_series.json");
+const FIN_POC_URL = FINANCIALS_URL.replace("financials_baskets.json", "financials_poc.json");
 
-let finData = null, finHealthData = null, finThemeData = null, finIdeasData = null, finPriceSeriesData = {};
-let finChartInstance = null;
+let finData = null, finHealthData = null, finThemeData = null, finIdeasData = null;
+let finPriceSeriesData = {}, finPocData = null;
+let finChartInstance = null, finHealthChartInstance = null;
 let finThemeExpanded = new Set();
 
 const FIN_METRIC_LABELS = {
@@ -2304,94 +2335,171 @@ const FIN_METRIC_LABELS = {
   pct_new_low_13w: "% at 13w Low", pct_new_low_26w: "% at 26w Low", pct_new_low_52w: "% at 52w Low",
   pct_volume_expansion: "% Volume Expansion", adv_dec_pct: "Advance/Decline %",
 };
-const FIN_SUMMARY_KEYS = ["pct_above_200dma", "pct_new_high_52w", "pct_new_low_52w", "adv_dec_pct"];
 
 async function loadFinancialsData(){
   try{
-    const [basketsRes, healthRes, themeRes, ideasRes, priceRes] = await Promise.all([
+    const [basketsRes, healthRes, themeRes, ideasRes, priceRes, pocRes] = await Promise.all([
       fetch(FINANCIALS_URL, {cache:"no-store"}),
       fetch(SECTOR_HEALTH_URL, {cache:"no-store"}),
       fetch(THEME_CONVICTION_URL, {cache:"no-store"}),
-      fetch(TOP_IDEAS_URL, {cache:"no-store"}),
+      fetch(COMPOSITE_IDEAS_URL, {cache:"no-store"}),
       fetch(FIN_PRICE_SERIES_URL, {cache:"no-store"}),
+      fetch(FIN_POC_URL, {cache:"no-store"}),
     ]);
-    
     if(!basketsRes.ok) throw new Error(`baskets HTTP ${basketsRes.status}`);
     if(!healthRes.ok) throw new Error(`sector health HTTP ${healthRes.status}`);
     finData = await basketsRes.json();
     finHealthData = await healthRes.json();
     finThemeData = themeRes.ok ? await themeRes.json() : null;
     finIdeasData = ideasRes.ok ? await ideasRes.json() : null;
-    if(priceRes.ok){
-      const priceJson = await priceRes.json();
-      finPriceSeriesData = priceJson.series || {};
-    }
-    renderFinSummary();
-    renderFinHealthTable();
-    renderFinThemeTable();
+    if(priceRes.ok){ const j = await priceRes.json(); finPriceSeriesData = j.series || {}; }
+    if(pocRes.ok){ finPocData = await pocRes.json(); }
+
+    renderFinScoreBox();
+    populateFinMetricSelect();
+    renderFinHealthChart(document.getElementById("finMetricSelect").value);
     renderFinIdeasTable();
+    renderFinThemeTable();
   }catch(err){
-    document.getElementById("finSummaryRow").innerHTML =
-      `<div class="empty-state">Could not load India Financials data: ${err.message}</div>`;
+    document.getElementById("finScoreCommentary").textContent = `Could not load India Financials data: ${err.message}`;
   }
 }
 
-function valueAtOffset(arr, offsetFromEnd){
-  const idx = arr.length - 1 - offsetFromEnd;
-  return idx >= 0 ? arr[idx] : null;
-}
-function fmtFin(n, suffix=""){
-  if(n === null || n === undefined || isNaN(n)) return "—";
-  return Number(n).toFixed(1) + suffix;
+// ---- Table 1: Composite Sector Score ----
+function computeSectorComposite(){
+  const m = finHealthData.metrics;
+  const last = arr => arr && arr.length ? arr[arr.length-1] : null;
+
+  const breadth = last(m.pct_above_200dma);
+  const highs = last(m.pct_new_high_52w);
+  const lows = last(m.pct_new_low_52w);
+  const volExp = last(m.pct_volume_expansion);
+  const advDec = last(m.adv_dec_pct);
+
+  const breadthScore = breadth!==null ? (breadth - 50) * 2 : 0;
+  const highsLowsScore = (highs!==null && lows!==null) ? (highs - lows) * 4 : 0;
+  const volScore = volExp!==null ? (volExp - 20) * 2.5 : 0;
+  const advDecScore = advDec!==null ? advDec : 0;
+
+  const clip = v => Math.max(-100, Math.min(100, v));
+  const sub = {
+    breadth: clip(breadthScore), highsLows: clip(highsLowsScore),
+    volume: clip(volScore), advDec: clip(advDecScore),
+  };
+  const composite = clip((sub.breadth + sub.highsLows + sub.volume + sub.advDec) / 4);
+
+  let label = "Neutral", cls = "neutral";
+  if(composite > 25){ label = "Bullish"; cls = "bullish"; }
+  else if(composite < -25){ label = "Bearish"; cls = "bearish"; }
+
+  const entries = [
+    {name:"Breadth", val:sub.breadth, pos:`${breadth?.toFixed(0)}% above 200DMA`},
+    {name:"New highs/lows", val:sub.highsLows, pos:`${highs?.toFixed(0)}% at 52w highs vs ${lows?.toFixed(0)}% at lows`},
+    {name:"Volume expansion", val:sub.volume, pos:`${volExp?.toFixed(0)}% of stocks showing volume expansion`},
+    {name:"Advance/Decline", val:sub.advDec, pos:`${advDec?.toFixed(0)}% net advancing`},
+  ];
+  entries.sort((a,b) => Math.abs(b.val) - Math.abs(a.val));
+  const lead = entries[0];
+  const second = entries[1];
+  const leadDir = lead.val >= 0 ? "positive" : "negative";
+  let commentary = `${lead.name} is the dominant driver today (${lead.pos}), reading ${leadDir}.`;
+  if(Math.sign(lead.val) !== Math.sign(second.val) && Math.abs(second.val) > 15){
+    commentary += ` However ${second.name.toLowerCase()} points the other way (${second.pos}) — some internal divergence, not a clean read across the board.`;
+  } else {
+    commentary += ` ${second.name} confirms the same direction (${second.pos}).`;
+  }
+
+  return { composite: Math.round(composite), label, cls, commentary };
 }
 
-function renderFinSummary(){
-  const row = document.getElementById("finSummaryRow");
-  row.innerHTML = FIN_SUMMARY_KEYS.map(key => {
-    const series = finHealthData.metrics[key] || [];
-    const latest = series[series.length - 1];
-    const cls = key.includes("low") ? "neg" : (key === "adv_dec_pct" ? (latest >= 0 ? "pos" : "neg") : "");
-    return `
-      <div class="fin-summary-stat" data-metric="${key}">
-        <div class="fin-summary-stat-label">${FIN_METRIC_LABELS[key]}</div>
-        <div class="fin-summary-stat-val ${cls}">${fmtFin(latest, "%")}</div>
-      </div>`;
-  }).join("");
+function renderFinScoreBox(){
+  const s = computeSectorComposite();
+  document.getElementById("finScoreBadge").textContent = s.label;
+  document.getElementById("finScoreBadge").className = `fin-score-badge ${s.cls}`;
+  document.getElementById("finScoreNum").textContent = (s.composite >= 0 ? "+" : "") + s.composite;
+  document.getElementById("finScoreCommentary").textContent = s.commentary;
 }
 
-function renderFinHealthTable(){
-  const body = document.getElementById("finHealthBody");
+function populateFinMetricSelect(){
+  const sel = document.getElementById("finMetricSelect");
+  sel.innerHTML = Object.keys(FIN_METRIC_LABELS).map(k => `<option value="${k}">${FIN_METRIC_LABELS[k]}</option>`).join("");
+  sel.value = "pct_above_200dma";
+  sel.addEventListener("change", () => renderFinHealthChart(sel.value));
+}
+
+function renderFinHealthChart(metricKey){
+  const series = finHealthData.metrics[metricKey];
   const dates = finHealthData.dates;
-  function findOffsetIndex(daysBack){
-    const targetDate = new Date(dates[dates.length - 1]);
-    targetDate.setDate(targetDate.getDate() - daysBack);
-    let closestIdx = 0, closestDiff = Infinity;
-    dates.forEach((d, i) => {
-      const diff = Math.abs(new Date(d) - targetDate);
-      if(diff < closestDiff){ closestDiff = diff; closestIdx = i; }
-    });
-    return dates.length - 1 - closestIdx;
+  if(!series) return;
+
+  const latest = series[series.length-1];
+  document.getElementById("finMetricCurrent").textContent =
+    `Latest: ${latest !== null && latest !== undefined ? latest.toFixed(1) + "%" : "—"}`;
+
+  if(finHealthChartInstance) finHealthChartInstance.destroy();
+  finHealthChartInstance = new Chart(document.getElementById("finHealthChart").getContext("2d"), {
+    type: "line",
+    data: { labels: dates, datasets: [{ label: FIN_METRIC_LABELS[metricKey], data: series,
+      borderColor: "#14171A", backgroundColor: "rgba(20,23,26,0.06)", borderWidth: 2, pointRadius: 0, fill: true, tension: 0.1 }] },
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.parsed.y.toFixed(1)}%` } } },
+      scales: { x: { ticks: { maxTicksLimit: 7, font: { size: 10 } } }, y: { ticks: { font: { size: 10 } } } } }
+  });
+}
+
+// ---- Table 2: Composite Top 10 Ideas ----
+let finIdeasSort = { key: "Composite_Score", dir: -1 };
+
+function sortFinRows(rows, sortState){
+  const {key, dir} = sortState;
+  return [...rows].sort((a,b) => {
+    const av=a[key], bv=b[key];
+    if(typeof av === "boolean") return ((av===bv)?0:(av?1:-1))*dir;
+    if(typeof av === "string") return av.localeCompare(bv) * dir;
+    const an=(av===null||av===undefined||isNaN(av))?-Infinity:av;
+    const bn=(bv===null||bv===undefined||isNaN(bv))?-Infinity:bv;
+    return (an-bn)*dir;
+  });
+}
+
+function renderFinIdeasTable(){
+  const body = document.getElementById("finIdeasBody");
+  if(!finIdeasData || !finIdeasData.ideas || !finIdeasData.ideas.length){
+    body.innerHTML = `<tr><td colspan="10" class="empty-state">No composite ideas data available.</td></tr>`;
+    return;
   }
-  const offset1m = findOffsetIndex(30), offset3m = findOffsetIndex(91);
-  body.innerHTML = Object.keys(FIN_METRIC_LABELS).map(key => {
-    const series = finHealthData.metrics[key] || [];
-    return `
-      <tr class="fin-table-row-clickable" data-metric="${key}">
-        <td class="ticker">${FIN_METRIC_LABELS[key]}</td>
-        <td class="num">${fmtFin(valueAtOffset(series,0),"%")}</td>
-        <td class="num">${fmtFin(valueAtOffset(series,offset1m),"%")}</td>
-        <td class="num">${fmtFin(valueAtOffset(series,offset3m),"%")}</td>
-      </tr>`;
-  }).join("");
+  const rows = sortFinRows(finIdeasData.ideas, finIdeasSort);
+  body.innerHTML = rows.map(r => `
+    <tr class="fin-table-row-clickable" data-ticker="${r.Ticker}">
+      <td class="ticker">${cleanTicker(r.Ticker)}<span class="name-sub">${r.Name||""}</span></td>
+      <td>${r.Theme||""}</td>
+      <td class="num">₹${fmt(r.Price)}</td>
+      <td class="num">${fmt(r.Ratio,3)}</td>
+      <td class="num">${fmt(r.TrendQuality,3)}</td>
+      <td class="num">${fmt(r.Absorption,3)}</td>
+      <td class="num">${fmt(r.FollowThrough,3)}</td>
+      <td class="num">${fmt(r.POC_Score,1)}</td>
+      <td><span class="tag ${r.Value_Discovery ? 'Yes' : 'No'}">${r.Value_Discovery ? 'Yes' : 'No'}</span></td>
+      <td class="num score-cell">${fmt(r.Composite_Score,1)}</td>
+    </tr>`).join("");
 }
 
-function pctChangeFin(values){
-  if(!values || values.length < 2) return null;
-  const first = values[0], last = values[values.length - 1];
-  if(!first) return null;
-  return ((last / first) - 1) * 100;
-}
+document.querySelectorAll("#finIdeasTable thead th").forEach(th => {
+  th.addEventListener("click", () => {
+    const key = th.dataset.key;
+    finIdeasSort.dir = (finIdeasSort.key === key) ? -finIdeasSort.dir : -1;
+    finIdeasSort.key = key;
+    renderFinIdeasTable();
+  });
+});
 
+document.getElementById("finIdeasBody").addEventListener("click", (e) => {
+  const row = e.target.closest("tr[data-ticker]");
+  if(!row) return;
+  openTickerChart(row.dataset.ticker);
+});
+
+// ---- Table 3: Theme Conviction (unchanged from v3) ----
 let finThemeRows = [];
 let finThemeSort = { key: "Conviction", dir: -1 };
 
@@ -2417,17 +2525,6 @@ function computeThemeRows(){
       Conviction: conv.Conviction ?? null, Driver: conv.Driver ?? "—",
       Lead_Stock: conv.Lead_Stock ?? null,
     };
-  });
-}
-
-function sortFinRows(rows, sortState){
-  const {key, dir} = sortState;
-  return [...rows].sort((a,b) => {
-    const av=a[key], bv=b[key];
-    if(typeof av === "string") return av.localeCompare(bv) * dir;
-    const an=(av===null||av===undefined||isNaN(av))?-Infinity:av;
-    const bn=(bv===null||bv===undefined||isNaN(bv))?-Infinity:bv;
-    return (an-bn)*dir;
   });
 }
 
@@ -2523,52 +2620,7 @@ document.getElementById("finThemeBody").addEventListener("click", (e) => {
   renderFinThemeTable();
 });
 
-// ---- Table 3: Top Ideas ----
-let finIdeasSort = { key: "PM_Score", dir: -1 };
-
-function renderFinIdeasTable(){
-  const body = document.getElementById("finIdeasBody");
-  if(!finIdeasData || !finIdeasData.ideas || !finIdeasData.ideas.length){
-    body.innerHTML = `<tr><td colspan="10" class="empty-state">No qualifying ideas in today's Financials-scoped run.</td></tr>`;
-    return;
-  }
-  const rows = sortFinRows(finIdeasData.ideas, finIdeasSort);
-  body.innerHTML = rows.map(r => `
-    <tr class="fin-table-row-clickable" data-ticker="${r.Ticker}">
-      <td class="ticker">${cleanTicker(r.Ticker)}</td>
-      <td>${r.Sub_Sector||""}</td>
-      <td><span class="tag ${r.Type}">${r.Type}</span></td>
-      <td class="num">₹${fmt(r.Price)}</td>
-      <td class="num">${fmt(r.Ratio,3)}</td>
-      <td class="num">${r.BaseDays}</td>
-      <td class="num">${fmt(r.TrendQuality,3)}</td>
-      <td class="num">${fmt(r.Absorption,3)}</td>
-      <td class="num">${fmt(r.FollowThrough,3)}</td>
-      <td class="num score-cell">${fmt(r.PM_Score,3)}</td>
-    </tr>`).join("");
-}
-
-document.querySelectorAll("#finIdeasTable thead th").forEach(th => {
-  th.addEventListener("click", () => {
-    const key = th.dataset.key;
-    finIdeasSort.dir = (finIdeasSort.key === key) ? -finIdeasSort.dir : -1;
-    finIdeasSort.key = key;
-    renderFinIdeasTable();
-  });
-});
-
-document.getElementById("finIdeasBody").addEventListener("click", (e) => {
-  const row = e.target.closest("tr[data-ticker]");
-  if(!row) return;
-  openTickerChart(row.dataset.ticker);
-});
-
-// ---- Chart drill-down ----
-function openFinMetricChart(key){
-  const series = finHealthData.metrics[key];
-  if(!series) return;
-  showFinChart(FIN_METRIC_LABELS[key], "Sector Health · 135 stocks · 1-year", finHealthData.dates, series, "%");
-}
+// ---- Chart drill-down (theme RS ratio) ----
 function openFinThemeRatioChart(themeName){
   const row = finThemeRows.find(r => r.Theme === themeName);
   if(!row || !row.ratio_series.length) return;
@@ -2594,17 +2646,6 @@ function closeFinChart(){
   document.getElementById("finGridView").style.display = "block";
   if(finChartInstance){ finChartInstance.destroy(); finChartInstance = null; }
 }
-
-document.getElementById("finSummaryRow").addEventListener("click", (e) => {
-  const stat = e.target.closest(".fin-summary-stat[data-metric]");
-  if(!stat) return;
-  openFinMetricChart(stat.dataset.metric);
-});
-document.getElementById("finHealthBody").addEventListener("click", (e) => {
-  const row = e.target.closest("tr[data-metric]");
-  if(!row) return;
-  openFinMetricChart(row.dataset.metric);
-});
 
 loadFinancialsData();
 loadPMNote();
