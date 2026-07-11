@@ -602,21 +602,10 @@
   .chart-ticker-sub{color:var(--sub);font-size:13px;margin-top:2px;}
 
   .chart-legend-note{font-size:12px;color:var(--sub);margin-top:10px;}
-    .fin-summary-row{
-    display:flex;
-    gap:10px;
-    flex-wrap:wrap;
-    margin-bottom:20px;
-  }
+    .fin-summary-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;}
   .fin-summary-stat{
-    flex:1;
-    min-width:140px;
-    background:var(--card);
-    border:1px solid var(--line);
-    border-radius:var(--radius);
-    padding:12px 14px;
-    cursor:pointer;
-    transition:border-color 0.15s;
+    flex:1;min-width:140px;background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);padding:12px 14px;cursor:pointer;transition:border-color 0.15s;
   }
   .fin-summary-stat:hover{border-color:var(--ink);}
   .fin-summary-stat-label{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:0.03em;}
@@ -636,6 +625,13 @@
   .fin-back-btn:hover{border-color:var(--ink);}
   .fin-val-pos{color:var(--teal);}
   .fin-val-neg{color:var(--err);}
+
+  .fin-pillar-bars{display:flex;gap:3px;margin-top:4px;width:80px;}
+  .fin-pillar-bar{flex:1;height:4px;border-radius:2px;background:var(--line);position:relative;overflow:hidden;}
+  .fin-pillar-bar-fill{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--violet);}
+
+  .fin-theme-detail-row td{padding:0;background:#FBFBFA;}
+  .fin-theme-detail-inner{padding:10px 14px 16px 20px;}
 </style>
 </head>
 <body>
@@ -877,34 +873,52 @@
 
   <div id="finGridView">
 
-    <div class="fin-summary-row" id="finSummaryRow">
-      <!-- injected by JS -->
-    </div>
+    <div class="fin-summary-row" id="finSummaryRow"></div>
 
-    <div class="disp-subhead">Sector Health — India Financials (135 stocks, equal-weight) · Click a metric for 1-year trend</div>
+    <div class="disp-subhead">Sector Health — India Financials (135 stocks) · Click a metric for 1-year trend</div>
     <table id="finHealthTable">
       <thead>
-        <tr>
-          <th>Metric</th>
-          <th class="num">Today</th>
-          <th class="num">1 Month Ago</th>
-          <th class="num">3 Months Ago</th>
-        </tr>
+        <tr><th>Metric</th><th class="num">Today</th><th class="num">1 Month Ago</th><th class="num">3 Months Ago</th></tr>
       </thead>
       <tbody id="finHealthBody"></tbody>
     </table>
 
-    <div class="disp-subhead">Thematic Ranking — vs India_Financials_Bmrk · Click a row for RS ratio trend</div>
+    <div class="disp-subhead">Theme Conviction — click a theme for its stocks · click RS Ratio for trend</div>
     <table id="finThemeTable">
       <thead>
         <tr>
-          <th data-key="theme">Theme</th>
+          <th data-key="Theme">Theme</th>
           <th data-key="n_stocks" class="num">Stocks</th>
           <th data-key="rs_ratio" class="num">RS Ratio</th>
-          <th data-key="index_chg_1y" class="num">1y Return</th>
+          <th data-key="Momentum" class="num">Momentum</th>
+          <th data-key="Structure" class="num">Structure</th>
+          <th data-key="Activation" class="num">Activation</th>
+          <th data-key="DQ" class="num">DQ</th>
+          <th data-key="Conviction" class="num">Conviction</th>
+          <th data-key="Driver">Driver</th>
+          <th data-key="Lead_Stock">Lead Stock</th>
         </tr>
       </thead>
       <tbody id="finThemeBody"></tbody>
+    </table>
+
+    <div class="disp-subhead">Top Ideas — PM Focus Screen (Financials-scoped) · Click a row for chart</div>
+    <table id="finIdeasTable">
+      <thead>
+        <tr>
+          <th data-key="Ticker">Ticker</th>
+          <th data-key="Sub_Sector">Theme</th>
+          <th data-key="Type">Type</th>
+          <th data-key="Price" class="num">Price</th>
+          <th data-key="Ratio" class="num">Ratio</th>
+          <th data-key="BaseDays" class="num">Base Days</th>
+          <th data-key="TrendQuality" class="num">Trend</th>
+          <th data-key="Absorption" class="num">Absorption</th>
+          <th data-key="FollowThrough" class="num">Follow-Thru</th>
+          <th data-key="PM_Score" class="num">PM Score</th>
+        </tr>
+      </thead>
+      <tbody id="finIdeasBody"></tbody>
     </table>
 
   </div>
@@ -912,14 +926,12 @@
   <div id="finChartView" style="display:none;">
     <div class="fin-chart-header">
       <div>
-        <div class="fin-bmrk-title" id="finChartTitle" style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;">—</div>
-        <div class="fin-bmrk-sub" id="finChartSub" style="color:var(--sub);font-size:12px;margin-top:2px;"></div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;" id="finChartTitle">—</div>
+        <div style="color:var(--sub);font-size:12px;margin-top:2px;" id="finChartSub"></div>
       </div>
       <button class="fin-back-btn" onclick="closeFinChart()">← Back</button>
     </div>
-    <div class="chart-wrap">
-      <canvas id="finChart"></canvas>
-    </div>
+    <div class="chart-wrap"><canvas id="finChart"></canvas></div>
   </div>
 
 </div>
@@ -2272,44 +2284,45 @@ document.querySelectorAll("#drawdownTable thead th").forEach(th=>{
 loadData();
 loadQA();
 loadPriceSeries();
-  
+
 const FINANCIALS_URL = DATA_URL.replace(
   "india-equity-dashboard-output/main/latest.json",
   "india-thematics-output/main/financials_baskets.json"
 );
 const SECTOR_HEALTH_URL = FINANCIALS_URL.replace("financials_baskets.json", "financials_sector_health.json");
+const THEME_CONVICTION_URL = FINANCIALS_URL.replace("financials_baskets.json", "financials_theme_conviction.json");
+const TOP_IDEAS_URL = FINANCIALS_URL.replace("financials_baskets.json", "financials_top_ideas.json");
 
-let finData = null;
-let finHealthData = null;
+let finData = null, finHealthData = null, finThemeData = null, finIdeasData = null;
 let finChartInstance = null;
+let finThemeExpanded = new Set();
 
 const FIN_METRIC_LABELS = {
-  pct_above_50dma:   "% Above 50DMA",
-  pct_above_200dma:  "% Above 200DMA",
-  pct_new_high_13w:  "% at 13w High",
-  pct_new_high_26w:  "% at 26w High",
-  pct_new_high_52w:  "% at 52w High",
-  pct_new_low_13w:   "% at 13w Low",
-  pct_new_low_26w:   "% at 26w Low",
-  pct_new_low_52w:   "% at 52w Low",
-  pct_volume_expansion: "% Volume Expansion",
-  adv_dec_pct:       "Advance/Decline %",
+  pct_above_50dma: "% Above 50DMA", pct_above_200dma: "% Above 200DMA",
+  pct_new_high_13w: "% at 13w High", pct_new_high_26w: "% at 26w High", pct_new_high_52w: "% at 52w High",
+  pct_new_low_13w: "% at 13w Low", pct_new_low_26w: "% at 26w Low", pct_new_low_52w: "% at 52w Low",
+  pct_volume_expansion: "% Volume Expansion", adv_dec_pct: "Advance/Decline %",
 };
 const FIN_SUMMARY_KEYS = ["pct_above_200dma", "pct_new_high_52w", "pct_new_low_52w", "adv_dec_pct"];
 
 async function loadFinancialsData(){
   try{
-    const [basketsRes, healthRes] = await Promise.all([
-      fetch(FINANCIALS_URL, {cache: "no-store"}),
-      fetch(SECTOR_HEALTH_URL, {cache: "no-store"}),
+    const [basketsRes, healthRes, themeRes, ideasRes] = await Promise.all([
+      fetch(FINANCIALS_URL, {cache:"no-store"}),
+      fetch(SECTOR_HEALTH_URL, {cache:"no-store"}),
+      fetch(THEME_CONVICTION_URL, {cache:"no-store"}),
+      fetch(TOP_IDEAS_URL, {cache:"no-store"}),
     ]);
     if(!basketsRes.ok) throw new Error(`baskets HTTP ${basketsRes.status}`);
     if(!healthRes.ok) throw new Error(`sector health HTTP ${healthRes.status}`);
     finData = await basketsRes.json();
     finHealthData = await healthRes.json();
+    finThemeData = themeRes.ok ? await themeRes.json() : null;
+    finIdeasData = ideasRes.ok ? await ideasRes.json() : null;
     renderFinSummary();
     renderFinHealthTable();
     renderFinThemeTable();
+    renderFinIdeasTable();
   }catch(err){
     document.getElementById("finSummaryRow").innerHTML =
       `<div class="empty-state">Could not load India Financials data: ${err.message}</div>`;
@@ -2320,7 +2333,6 @@ function valueAtOffset(arr, offsetFromEnd){
   const idx = arr.length - 1 - offsetFromEnd;
   return idx >= 0 ? arr[idx] : null;
 }
-
 function fmtFin(n, suffix=""){
   if(n === null || n === undefined || isNaN(n)) return "—";
   return Number(n).toFixed(1) + suffix;
@@ -2331,53 +2343,38 @@ function renderFinSummary(){
   row.innerHTML = FIN_SUMMARY_KEYS.map(key => {
     const series = finHealthData.metrics[key] || [];
     const latest = series[series.length - 1];
-    const isNeg = key.includes("low") && latest > 0;
-    const isPos = (key.includes("high") || key === "pct_above_200dma" || key === "adv_dec_pct") && latest > 0;
     const cls = key.includes("low") ? "neg" : (key === "adv_dec_pct" ? (latest >= 0 ? "pos" : "neg") : "");
     return `
       <div class="fin-summary-stat" data-metric="${key}">
         <div class="fin-summary-stat-label">${FIN_METRIC_LABELS[key]}</div>
-        <div class="fin-summary-stat-val ${cls}">${fmtFin(latest, key.startsWith("pct") || key === "adv_dec_pct" ? "%" : "")}</div>
-      </div>
-    `;
+        <div class="fin-summary-stat-val ${cls}">${fmtFin(latest, "%")}</div>
+      </div>`;
   }).join("");
 }
 
 function renderFinHealthTable(){
   const body = document.getElementById("finHealthBody");
   const dates = finHealthData.dates;
-
-  // Find index roughly 1 month (21 trading-ish / 30 calendar days) and
-  // 3 months (91 calendar days) back from the end, by date proximity.
   function findOffsetIndex(daysBack){
     const targetDate = new Date(dates[dates.length - 1]);
     targetDate.setDate(targetDate.getDate() - daysBack);
-    const targetStr = targetDate.toISOString().slice(0, 10);
     let closestIdx = 0, closestDiff = Infinity;
     dates.forEach((d, i) => {
-      const diff = Math.abs(new Date(d) - new Date(targetStr));
+      const diff = Math.abs(new Date(d) - targetDate);
       if(diff < closestDiff){ closestDiff = diff; closestIdx = i; }
     });
     return dates.length - 1 - closestIdx;
   }
-
-  const offset1m = findOffsetIndex(30);
-  const offset3m = findOffsetIndex(91);
-
-  const rows = Object.keys(FIN_METRIC_LABELS);
-  body.innerHTML = rows.map(key => {
+  const offset1m = findOffsetIndex(30), offset3m = findOffsetIndex(91);
+  body.innerHTML = Object.keys(FIN_METRIC_LABELS).map(key => {
     const series = finHealthData.metrics[key] || [];
-    const today = valueAtOffset(series, 0);
-    const ago1m = valueAtOffset(series, offset1m);
-    const ago3m = valueAtOffset(series, offset3m);
     return `
       <tr class="fin-table-row-clickable" data-metric="${key}">
         <td class="ticker">${FIN_METRIC_LABELS[key]}</td>
-        <td class="num">${fmtFin(today, "%")}</td>
-        <td class="num">${fmtFin(ago1m, "%")}</td>
-        <td class="num">${fmtFin(ago3m, "%")}</td>
-      </tr>
-    `;
+        <td class="num">${fmtFin(valueAtOffset(series,0),"%")}</td>
+        <td class="num">${fmtFin(valueAtOffset(series,offset1m),"%")}</td>
+        <td class="num">${fmtFin(valueAtOffset(series,offset3m),"%")}</td>
+      </tr>`;
   }).join("");
 }
 
@@ -2389,56 +2386,107 @@ function pctChangeFin(values){
 }
 
 let finThemeRows = [];
-let finThemeSort = { key: "rs_ratio", dir: -1 };
+let finThemeSort = { key: "Conviction", dir: -1 };
 
 function computeThemeRows(){
-  const bDates = finData.benchmark.dates;
-  const bValues = finData.benchmark.values;
+  const bDates = finData.benchmark.dates, bValues = finData.benchmark.values;
   const bByDate = {};
-  bDates.forEach((d, i) => bByDate[d] = bValues[i]);
+  bDates.forEach((d,i) => bByDate[d] = bValues[i]);
+
+  const convictionMap = {};
+  if(finThemeData) finThemeData.themes.forEach(t => convictionMap[t.Theme] = t);
 
   return Object.keys(finData.themes).map(name => {
     const t = finData.themes[name];
     const commonDates = t.dates.filter(d => d in bByDate);
     const ratioSeries = commonDates.map(d => t.values[t.dates.indexOf(d)] / bByDate[d]);
-    const latestRatio = ratioSeries.length ? ratioSeries[ratioSeries.length - 1] : null;
+    const latestRatio = ratioSeries.length ? ratioSeries[ratioSeries.length-1] : null;
+    const conv = convictionMap[name] || {};
     return {
-      theme: name,
-      n_stocks: t.n_stocks,
-      rs_ratio: latestRatio,
-      index_chg_1y: pctChangeFin(t.values),
-      ratio_dates: commonDates,
-      ratio_series: ratioSeries,
+      Theme: name, n_stocks: t.n_stocks, rs_ratio: latestRatio,
+      ratio_dates: commonDates, ratio_series: ratioSeries,
+      Momentum: conv.Momentum ?? null, Structure: conv.Structure ?? null,
+      Activation: conv.Activation ?? null, DQ: conv.DQ ?? null,
+      Conviction: conv.Conviction ?? null, Driver: conv.Driver ?? "—",
+      Lead_Stock: conv.Lead_Stock ?? null,
     };
   });
 }
 
-function sortFinThemeRows(rows, sortState){
+function sortFinRows(rows, sortState){
   const {key, dir} = sortState;
-  return [...rows].sort((a, b) => {
-    const av = a[key], bv = b[key];
+  return [...rows].sort((a,b) => {
+    const av=a[key], bv=b[key];
     if(typeof av === "string") return av.localeCompare(bv) * dir;
-    const an = (av === null || av === undefined || isNaN(av)) ? -Infinity : av;
-    const bn = (bv === null || bv === undefined || isNaN(bv)) ? -Infinity : bv;
-    return (an - bn) * dir;
+    const an=(av===null||av===undefined||isNaN(av))?-Infinity:av;
+    const bn=(bv===null||bv===undefined||isNaN(bv))?-Infinity:bv;
+    return (an-bn)*dir;
   });
+}
+
+function pillarBar(val){
+  if(val === null || val === undefined) return "—";
+  return `<div>${val.toFixed(0)}<div class="fin-pillar-bars"><div class="fin-pillar-bar"><div class="fin-pillar-bar-fill" style="width:${Math.min(val,100)}%"></div></div></div></div>`;
 }
 
 function renderFinThemeTable(){
   finThemeRows = computeThemeRows();
-  const sorted = sortFinThemeRows(finThemeRows, finThemeSort);
+  const sorted = sortFinRows(finThemeRows, finThemeSort);
   const body = document.getElementById("finThemeBody");
 
-  body.innerHTML = sorted.map(r => `
-    <tr class="fin-table-row-clickable" data-theme="${r.theme}">
-      <td class="ticker">${r.theme}</td>
-      <td class="num">${r.n_stocks}</td>
-      <td class="num">${r.rs_ratio !== null ? r.rs_ratio.toFixed(3) : "—"}</td>
-      <td class="num ${r.index_chg_1y !== null ? (r.index_chg_1y >= 0 ? 'fin-val-pos' : 'fin-val-neg') : ''}">
-        ${r.index_chg_1y !== null ? (r.index_chg_1y >= 0 ? '+' : '') + r.index_chg_1y.toFixed(1) + '%' : '—'}
-      </td>
-    </tr>
-  `).join("");
+  body.innerHTML = sorted.map(r => {
+    const isOpen = finThemeExpanded.has(r.Theme);
+    const mainRow = `
+      <tr class="fin-table-row-clickable" data-theme-row="${r.Theme}">
+        <td class="ticker">${isOpen ? "▼ " : "▶ "}${r.Theme}</td>
+        <td class="num">${r.n_stocks}</td>
+        <td class="num" data-theme-ratio="${r.Theme}" style="text-decoration:underline;text-decoration-color:var(--line);">${r.rs_ratio!==null?r.rs_ratio.toFixed(3):"—"}</td>
+        <td class="num">${pillarBar(r.Momentum)}</td>
+        <td class="num">${pillarBar(r.Structure)}</td>
+        <td class="num">${pillarBar(r.Activation)}</td>
+        <td class="num">${pillarBar(r.DQ)}</td>
+        <td class="num score-cell">${r.Conviction!==null?r.Conviction.toFixed(1):"—"}</td>
+        <td>${r.Driver!=="—"?`<span class="tag ${r.Driver}">${r.Driver}</span>`:"—"}</td>
+        <td>${r.Lead_Stock?`<span class="ticker-link" data-ticker="${r.Lead_Stock}">${cleanTicker(r.Lead_Stock)}</span>`:"—"}</td>
+      </tr>`;
+    const detailRow = isOpen ? `
+      <tr class="fin-theme-detail-row"><td colspan="10">${renderThemeStockDetail(r.Theme)}</td></tr>` : "";
+    return mainRow + detailRow;
+  }).join("");
+}
+
+function renderThemeStockDetail(themeName){
+  if(!finThemeData || !finThemeData.stocks_by_theme[themeName]){
+    return `<div class="rrg-empty-detail">No stock-level data available for this theme.</div>`;
+  }
+  const stocks = finThemeData.stocks_by_theme[themeName];
+  const rows = stocks.map(s => `
+    <tr data-ticker="${s.Ticker}">
+      <td class="ticker">${cleanTicker(s.Ticker)}<span class="name-sub">${s.Name||""}</span></td>
+      <td><span class="tag ${s.Type}">${s.Type}</span></td>
+      <td class="num">₹${fmt(s.Price)}</td>
+      <td class="num">${fmt(s.Ratio,3)}</td>
+      <td class="num">${s.BaseDays}</td>
+      <td class="num">${fmt(s.TrendQuality,3)}</td>
+      <td class="num">${fmt(s.Absorption,3)}</td>
+      <td class="num">${fmt(s.FollowThrough,3)}</td>
+      <td class="num score-cell">${fmt(s.PM_Score,3)}</td>
+      <td class="num">${s.Displacement_Z!==null?fmt(s.Displacement_Z,2):"—"}</td>
+      <td class="num">${s.Volume_Z!==null?fmt(s.Volume_Z,2):"—"}</td>
+      <td>${s.Structural_Level!=="None"?s.Structural_Level:"—"}</td>
+    </tr>`).join("");
+  return `
+    <div class="fin-theme-detail-inner">
+      <table class="rrg-stock-table">
+        <thead><tr>
+          <th>Ticker</th><th>Type</th><th class="num">Price</th><th class="num">Ratio</th>
+          <th class="num">Base Days</th><th class="num">Trend</th><th class="num">Absorption</th>
+          <th class="num">Follow-Thru</th><th class="num">PM Score</th>
+          <th class="num">Disp Z</th><th class="num">Vol Z</th><th>Level</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
 }
 
 document.querySelectorAll("#finThemeTable thead th").forEach(th => {
@@ -2450,59 +2498,90 @@ document.querySelectorAll("#finThemeTable thead th").forEach(th => {
   });
 });
 
-// ---- Chart drill-down: metric (Table 1) or theme RS ratio (Table 2) ----
+document.getElementById("finThemeBody").addEventListener("click", (e) => {
+  const ratioCell = e.target.closest("[data-theme-ratio]");
+  if(ratioCell){ openFinThemeRatioChart(ratioCell.dataset.themeRatio); return; }
+
+  const stockRow = e.target.closest("tr[data-ticker]");
+  if(stockRow){ openTickerChart(stockRow.dataset.ticker); return; }
+
+  const link = e.target.closest(".ticker-link[data-ticker]");
+  if(link){ openTickerChart(link.dataset.ticker); return; }
+
+  const row = e.target.closest("tr[data-theme-row]");
+  if(!row) return;
+  const key = row.dataset.themeRow;
+  if(finThemeExpanded.has(key)) finThemeExpanded.delete(key);
+  else finThemeExpanded.add(key);
+  renderFinThemeTable();
+});
+
+// ---- Table 3: Top Ideas ----
+let finIdeasSort = { key: "PM_Score", dir: -1 };
+
+function renderFinIdeasTable(){
+  const body = document.getElementById("finIdeasBody");
+  if(!finIdeasData || !finIdeasData.ideas || !finIdeasData.ideas.length){
+    body.innerHTML = `<tr><td colspan="10" class="empty-state">No qualifying ideas in today's Financials-scoped run.</td></tr>`;
+    return;
+  }
+  const rows = sortFinRows(finIdeasData.ideas, finIdeasSort);
+  body.innerHTML = rows.map(r => `
+    <tr class="fin-table-row-clickable" data-ticker="${r.Ticker}">
+      <td class="ticker">${cleanTicker(r.Ticker)}</td>
+      <td>${r.Sub_Sector||""}</td>
+      <td><span class="tag ${r.Type}">${r.Type}</span></td>
+      <td class="num">₹${fmt(r.Price)}</td>
+      <td class="num">${fmt(r.Ratio,3)}</td>
+      <td class="num">${r.BaseDays}</td>
+      <td class="num">${fmt(r.TrendQuality,3)}</td>
+      <td class="num">${fmt(r.Absorption,3)}</td>
+      <td class="num">${fmt(r.FollowThrough,3)}</td>
+      <td class="num score-cell">${fmt(r.PM_Score,3)}</td>
+    </tr>`).join("");
+}
+
+document.querySelectorAll("#finIdeasTable thead th").forEach(th => {
+  th.addEventListener("click", () => {
+    const key = th.dataset.key;
+    finIdeasSort.dir = (finIdeasSort.key === key) ? -finIdeasSort.dir : -1;
+    finIdeasSort.key = key;
+    renderFinIdeasTable();
+  });
+});
+
+document.getElementById("finIdeasBody").addEventListener("click", (e) => {
+  const row = e.target.closest("tr[data-ticker]");
+  if(!row) return;
+  openTickerChart(row.dataset.ticker);
+});
+
+// ---- Chart drill-down ----
 function openFinMetricChart(key){
   const series = finHealthData.metrics[key];
   if(!series) return;
-  showFinChart(FIN_METRIC_LABELS[key], "Sector Health · 135 stocks, equal-weight · 1-year",
-    finHealthData.dates, series, key.startsWith("pct") || key === "adv_dec_pct" ? "%" : "");
+  showFinChart(FIN_METRIC_LABELS[key], "Sector Health · 135 stocks · 1-year", finHealthData.dates, series, "%");
 }
-
 function openFinThemeRatioChart(themeName){
-  const row = finThemeRows.find(r => r.theme === themeName);
+  const row = finThemeRows.find(r => r.Theme === themeName);
   if(!row || !row.ratio_series.length) return;
-  showFinChart(`${themeName} ÷ India_Financials_Bmrk`, `${row.n_stocks} stocks · RS Ratio · 1-year`,
-    row.ratio_dates, row.ratio_series, "");
+  showFinChart(`${themeName} ÷ India_Financials_Bmrk`, `${row.n_stocks} stocks · RS Ratio · 1-year`, row.ratio_dates, row.ratio_series, "");
 }
-
 function showFinChart(title, sub, dates, values, suffix){
   document.getElementById("finGridView").style.display = "none";
   document.getElementById("finChartView").style.display = "block";
   document.getElementById("finChartTitle").textContent = title;
   document.getElementById("finChartSub").textContent = sub;
-
   if(finChartInstance) finChartInstance.destroy();
   finChartInstance = new Chart(document.getElementById("finChart").getContext("2d"), {
     type: "line",
-    data: {
-      labels: dates,
-      datasets: [{
-        label: title,
-        data: values,
-        borderColor: "#14171A",
-        backgroundColor: "rgba(20,23,26,0.06)",
-        borderWidth: 2,
-        pointRadius: 0,
-        fill: true,
-        tension: 0.1
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: "index", intersect: false },
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: (ctx) => `${ctx.parsed.y.toFixed(2)}${suffix}` } }
-      },
-      scales: {
-        x: { ticks: { maxTicksLimit: 7, font: { size: 10 } } },
-        y: { ticks: { font: { size: 10 } } }
-      }
-    }
+    data: { labels: dates, datasets: [{ label: title, data: values, borderColor: "#14171A",
+      backgroundColor: "rgba(20,23,26,0.06)", borderWidth: 2, pointRadius: 0, fill: true, tension: 0.1 }] },
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.parsed.y.toFixed(2)}${suffix}` } } },
+      scales: { x: { ticks: { maxTicksLimit: 7, font: { size: 10 } } }, y: { ticks: { font: { size: 10 } } } } }
   });
 }
-
 function closeFinChart(){
   document.getElementById("finChartView").style.display = "none";
   document.getElementById("finGridView").style.display = "block";
@@ -2514,17 +2593,10 @@ document.getElementById("finSummaryRow").addEventListener("click", (e) => {
   if(!stat) return;
   openFinMetricChart(stat.dataset.metric);
 });
-
 document.getElementById("finHealthBody").addEventListener("click", (e) => {
   const row = e.target.closest("tr[data-metric]");
   if(!row) return;
   openFinMetricChart(row.dataset.metric);
-});
-
-document.getElementById("finThemeBody").addEventListener("click", (e) => {
-  const row = e.target.closest("tr[data-theme]");
-  if(!row) return;
-  openFinThemeRatioChart(row.dataset.theme);
 });
 
 loadFinancialsData();
