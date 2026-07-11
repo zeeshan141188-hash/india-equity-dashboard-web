@@ -1559,7 +1559,7 @@ function closeTickerChart(){
 function renderTickerChart(){
   const wrap = document.querySelector("#tickerChartView .chart-wrap");
   const note = document.getElementById("chartLegendNote");
-  const series = priceSeriesData[currentChartTicker];
+  const series = priceSeriesData[currentChartTicker] || finPriceSeriesData[currentChartTicker];
 
   if(!series || !series.dates || !series.dates.length){
     wrap.innerHTML = `<div class="empty-state">No chart data yet for ${cleanTicker(currentChartTicker)} — new entrants get chart data starting with the next daily run.</div>`;
@@ -2292,8 +2292,9 @@ const FINANCIALS_URL = DATA_URL.replace(
 const SECTOR_HEALTH_URL = FINANCIALS_URL.replace("financials_baskets.json", "financials_sector_health.json");
 const THEME_CONVICTION_URL = FINANCIALS_URL.replace("financials_baskets.json", "financials_theme_conviction.json");
 const TOP_IDEAS_URL = FINANCIALS_URL.replace("financials_baskets.json", "financials_top_ideas.json");
+const FIN_PRICE_SERIES_URL = FINANCIALS_URL.replace("financials_baskets.json", "financials_price_series.json");
 
-let finData = null, finHealthData = null, finThemeData = null, finIdeasData = null;
+let finData = null, finHealthData = null, finThemeData = null, finIdeasData = null, finPriceSeriesData = {};
 let finChartInstance = null;
 let finThemeExpanded = new Set();
 
@@ -2307,18 +2308,24 @@ const FIN_SUMMARY_KEYS = ["pct_above_200dma", "pct_new_high_52w", "pct_new_low_5
 
 async function loadFinancialsData(){
   try{
-    const [basketsRes, healthRes, themeRes, ideasRes] = await Promise.all([
+    const [basketsRes, healthRes, themeRes, ideasRes, priceRes] = await Promise.all([
       fetch(FINANCIALS_URL, {cache:"no-store"}),
       fetch(SECTOR_HEALTH_URL, {cache:"no-store"}),
       fetch(THEME_CONVICTION_URL, {cache:"no-store"}),
       fetch(TOP_IDEAS_URL, {cache:"no-store"}),
+      fetch(FIN_PRICE_SERIES_URL, {cache:"no-store"}),
     ]);
+    
     if(!basketsRes.ok) throw new Error(`baskets HTTP ${basketsRes.status}`);
     if(!healthRes.ok) throw new Error(`sector health HTTP ${healthRes.status}`);
     finData = await basketsRes.json();
     finHealthData = await healthRes.json();
     finThemeData = themeRes.ok ? await themeRes.json() : null;
     finIdeasData = ideasRes.ok ? await ideasRes.json() : null;
+    if(priceRes.ok){
+      const priceJson = await priceRes.json();
+      finPriceSeriesData = priceJson.series || {};
+    }
     renderFinSummary();
     renderFinHealthTable();
     renderFinThemeTable();
