@@ -602,6 +602,45 @@
   .chart-ticker-sub{color:var(--sub);font-size:13px;margin-top:2px;}
 
   .chart-legend-note{font-size:12px;color:var(--sub);margin-top:10px;}
+  .fin-bmrk-tile{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:16px 18px;
+    margin-bottom:16px;
+    cursor:pointer;
+    transition:border-color 0.15s;
+  }
+  .fin-bmrk-tile:hover{border-color:var(--ink);}
+  .fin-bmrk-title{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;}
+  .fin-bmrk-sub{color:var(--sub);font-size:12px;margin-top:2px;}
+  .fin-bmrk-val{font-family:'IBM Plex Mono',monospace;font-size:20px;margin-top:6px;}
+  .fin-theme-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));
+    gap:10px;
+  }
+  .fin-theme-tile{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:12px 14px;
+    cursor:pointer;
+    transition:border-color 0.15s;
+  }
+  .fin-theme-tile:hover{border-color:var(--ink);}
+  .fin-theme-name{font-size:13px;font-weight:600;}
+  .fin-theme-meta{color:var(--sub);font-size:11.5px;margin-top:3px;}
+  .fin-theme-val{font-family:'IBM Plex Mono',monospace;font-size:15px;margin-top:6px;}
+  .fin-theme-val.up{color:var(--teal);}
+  .fin-theme-val.down{color:var(--err);}
+  #panel-financials .chart-wrap{height:320px;margin-top:14px;}
+  .fin-chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .fin-back-btn{
+    background:none;border:1px solid var(--line);border-radius:6px;
+    padding:6px 12px;font-size:12px;cursor:pointer;color:var(--ink);
+  }
+  .fin-back-btn:hover{border-color:var(--ink);}
 </style>
 </head>
 <body>
@@ -631,6 +670,7 @@
     <button class="tab-btn" data-tab="rrg">Sector Rotation</button>
     <button class="tab-btn" data-tab="drawdown">Drawdown Tracker</button>
     <button class="tab-btn" data-tab="ask">Ask</button>
+    <button class="tab-btn" data-tab="financials">India Financials</button>
     <button class="tab-btn" data-tab="pmnote">PM Note</button>
   </div>
 
@@ -838,6 +878,35 @@
     <div class="ask-answer-box" id="askAnswerBox" style="display:none;"></div>
   </div>
 
+  <div class="panel" id="panel-financials">
+
+  <div id="finGridView">
+    <div class="fin-bmrk-tile" id="finBmrkTile">
+      <div class="fin-bmrk-title">India_Financials_Bmrk</div>
+      <div class="fin-bmrk-sub" id="finBmrkMeta">Loading…</div>
+      <div class="fin-bmrk-val" id="finBmrkVal">—</div>
+    </div>
+
+    <div class="fin-theme-grid" id="finThemeGrid">
+      <!-- theme tiles injected by JS -->
+    </div>
+  </div>
+
+  <div id="finChartView" style="display:none;">
+    <div class="fin-chart-header">
+      <div>
+        <div class="fin-bmrk-title" id="finChartTitle">—</div>
+        <div class="fin-bmrk-sub" id="finChartSub"></div>
+      </div>
+      <button class="fin-back-btn" onclick="closeFinChart()">← Back</button>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="finChart"></canvas>
+    </div>
+  </div>
+
+</div>
+  
   <div class="panel" id="panel-pmnote">
     <div class="pmnote-page-layout">
       <div class="pmnote-main-col">
@@ -2186,6 +2255,128 @@ document.querySelectorAll("#drawdownTable thead th").forEach(th=>{
 loadData();
 loadQA();
 loadPriceSeries();
+  
+const FINANCIALS_URL = DATA_URL.replace(
+  "india-equity-dashboard-output/main/latest.json",
+  "india-thematics-output/main/financials_baskets.json"
+);
+// If your India Thematics output repo has a different name, just edit the
+// string above directly, e.g.:
+// const FINANCIALS_URL = "https://raw.githubusercontent.com/<you>/india-thematics-output/main/financials_baskets.json";
+
+let finData = null;
+let finChartInstance = null;
+
+async function loadFinancialsData(){
+  try{
+    const res = await fetch(FINANCIALS_URL, {cache: "no-store"});
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    finData = await res.json();
+    renderFinancialsGrid();
+  }catch(err){
+    document.getElementById("finBmrkMeta").textContent = "Data not available yet";
+    document.getElementById("finThemeGrid").innerHTML =
+      `<div class="empty-state">Could not load India Financials data: ${err.message}</div>`;
+  }
+}
+
+function pctChange(values){
+  if(!values || values.length < 2) return null;
+  const first = values[0], last = values[values.length - 1];
+  if(!first) return null;
+  return ((last / first) - 1) * 100;
+}
+
+function renderFinancialsGrid(){
+  if(!finData) return;
+
+  const b = finData.benchmark;
+  const bChange = pctChange(b.values);
+  document.getElementById("finBmrkMeta").textContent =
+    `${b.n_stocks} stocks, equal-weight · as of ${finData.as_of}`;
+  document.getElementById("finBmrkVal").innerHTML =
+    `${b.values[b.values.length-1]?.toFixed(2) ?? "—"}` +
+    (bChange !== null ? ` <span style="font-size:13px;color:${bChange>=0?'var(--teal)':'var(--err)'}">${bChange>=0?'+':''}${bChange.toFixed(1)}% (1y)</span>` : "");
+
+  const grid = document.getElementById("finThemeGrid");
+  grid.innerHTML = "";
+
+  const themeNames = Object.keys(finData.themes).sort();
+  for(const name of themeNames){
+    const t = finData.themes[name];
+    const change = pctChange(t.values);
+    const lastVal = t.values.length ? t.values[t.values.length-1].toFixed(2) : "—";
+    const tile = document.createElement("div");
+    tile.className = "fin-theme-tile";
+    tile.dataset.theme = name;
+    tile.innerHTML = `
+      <div class="fin-theme-name">${name}</div>
+      <div class="fin-theme-meta">${t.n_stocks} stocks</div>
+      <div class="fin-theme-val ${change!==null ? (change>=0?'up':'down') : ''}">
+        ${lastVal}${change!==null ? ` (${change>=0?'+':''}${change.toFixed(1)}%)` : ''}
+      </div>`;
+    grid.appendChild(tile);
+  }
+}
+
+function openFinChart(key){
+  const series = key === "__benchmark__" ? finData.benchmark : finData.themes[key];
+  if(!series) return;
+
+  document.getElementById("finGridView").style.display = "none";
+  document.getElementById("finChartView").style.display = "block";
+  document.getElementById("finChartTitle").textContent =
+    key === "__benchmark__" ? "India_Financials_Bmrk" : key;
+  document.getElementById("finChartSub").textContent =
+    `${series.n_stocks} stocks, equal-weight, rebased to 100 · 1-year`;
+
+  if(finChartInstance) finChartInstance.destroy();
+  finChartInstance = new Chart(document.getElementById("finChart").getContext("2d"), {
+    type: "line",
+    data: {
+      labels: series.dates,
+      datasets: [{
+        label: key === "__benchmark__" ? "India_Financials_Bmrk" : key,
+        data: series.values,
+        borderColor: "#14171A",
+        backgroundColor: "rgba(20,23,26,0.06)",
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: true,
+        tension: 0.1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (ctx) => `Index: ${ctx.parsed.y.toFixed(2)}` } }
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 7, font: { size: 10 } } },
+        y: { ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function closeFinChart(){
+  document.getElementById("finChartView").style.display = "none";
+  document.getElementById("finGridView").style.display = "block";
+  if(finChartInstance){ finChartInstance.destroy(); finChartInstance = null; }
+}
+
+document.getElementById("finBmrkTile").addEventListener("click", () => openFinChart("__benchmark__"));
+document.getElementById("finThemeGrid").addEventListener("click", (e) => {
+  const tile = e.target.closest(".fin-theme-tile[data-theme]");
+  if(!tile) return;
+  openFinChart(tile.dataset.theme);
+});
+
+// Kick off load. Call this alongside your existing loadData()/loadPriceSeries() calls.
+loadFinancialsData();
 loadPMNote();
 </script>
 </body>
