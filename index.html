@@ -645,7 +645,25 @@
 
   .tag.Yes{background:var(--teal-bg);color:var(--teal);}
   .tag.No{background:var(--line);color:var(--sub);}
+ 
+  /* ---- Quant Strategy (Correl Tracker) ---- */
+  .tag.DecouplingUp{background:var(--teal-bg);color:var(--teal);}
+  .tag.DecouplingDown{background:#FBE6E3;color:var(--err);}
+  .tag.Stable{background:var(--line);color:var(--sub);}
+  .quant-lown{
+    display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;
+    padding:1px 6px;border-radius:4px;background:var(--gold-bg);color:var(--gold);margin-left:6px;
+  }
+  .quant-caption{font-size:12.5px;color:var(--sub);margin:-6px 0 14px;}
+  .quant-pair-cell{white-space:normal;}
+  .quant-subblock-label{
+    font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:12px;
+    letter-spacing:0.03em;color:var(--sub);margin:14px 0 6px;
+  }
+  .quant-subblock-label:first-child{margin-top:0;}
 </style>
+</style>
+ 
 </head>
 <body>
 
@@ -918,7 +936,7 @@
       <tbody id="finIdeasBody"></tbody>
     </table>
     <div class="cards" id="finIdeasCards"></div>
-
+    
     <div class="disp-subhead">Theme Conviction — click a theme for its stocks · click RS Ratio for trend</div>
     <table id="finThemeTable">
       <thead>
@@ -938,6 +956,7 @@
       <tbody id="finThemeBody"></tbody>
     </table>
     <div class="cards" id="finThemeCards"></div>
+    <div id="quantStrategyMount"></div>
 
   </div>
 
@@ -2750,6 +2769,16 @@ function openFinMetricChart(key){
 
 loadFinancialsData();
 loadPMNote();
+loadQuantStrategyTab();
+
+async function loadQuantStrategyTab(){
+  const mount = document.getElementById("quantStrategyMount");
+  const html = await fetch("quant-strategy.html").then(r => r.text());
+  mount.innerHTML = html;
+  const s = document.createElement("script");
+  s.src = "quant-strategy.js";
+  document.body.appendChild(s);
+}
 </script>
 </body>
 </html>
