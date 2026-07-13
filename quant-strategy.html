@@ -1,8 +1,8 @@
 <div class="disp-subhead">Quant Strategy — Correlation Regime Tracker</div>
 <p class="quant-caption" id="quantAsOfCaption"></p>
 
-<div class="quant-subblock-label">Stock vs Basket — decoupling from own theme (idea generation) · click a row for chart</div>
-<table id="finCorrel1Table">
+<div class="quant-subblock-label">Stock vs Basket — top 5 Decoupling Up (idea generation) · click a row for chart</div>
+<table id="finCorrel1UpTable">
   <thead>
     <tr>
       <th data-key="Ticker">Ticker</th>
@@ -12,15 +12,31 @@
       <th data-key="Corr_Delta" class="num">Corr Δ</th>
       <th data-key="Stock_Ret_20D" class="num">Stock Ret 20D</th>
       <th data-key="Basket_Ret_20D" class="num">Basket Ret 20D</th>
-      <th data-key="Flag">Flag</th>
     </tr>
   </thead>
-  <tbody id="finCorrel1Body"></tbody>
+  <tbody id="finCorrel1UpBody"></tbody>
 </table>
-<div class="cards" id="finCorrel1Cards"></div>
+<div class="cards" id="finCorrel1UpCards"></div>
 
-<div class="quant-subblock-label">Basket Cohesion — theme fragmenting internally (thesis-risk)</div>
-<table id="finCorrel2Table">
+<div class="quant-subblock-label">Stock vs Basket — top 5 Decoupling Down (thesis-risk) · click a row for chart</div>
+<table id="finCorrel1DownTable">
+  <thead>
+    <tr>
+      <th data-key="Ticker">Ticker</th>
+      <th data-key="Theme">Theme</th>
+      <th data-key="Corr_20D" class="num">Corr 20D</th>
+      <th data-key="Corr_60D" class="num">Corr 60D</th>
+      <th data-key="Corr_Delta" class="num">Corr Δ</th>
+      <th data-key="Stock_Ret_20D" class="num">Stock Ret 20D</th>
+      <th data-key="Basket_Ret_20D" class="num">Basket Ret 20D</th>
+    </tr>
+  </thead>
+  <tbody id="finCorrel1DownBody"></tbody>
+</table>
+<div class="cards" id="finCorrel1DownCards"></div>
+
+<div class="quant-subblock-label">Basket Cohesion — top 5 most-fragmenting themes (thesis-risk)</div>
+<table id="finCorrel2FragTable">
   <thead>
     <tr>
       <th data-key="Theme">Theme</th>
@@ -30,11 +46,26 @@
       <th data-key="Cohesion_Delta" class="num">Cohesion Δ</th>
     </tr>
   </thead>
-  <tbody id="finCorrel2Body"></tbody>
+  <tbody id="finCorrel2FragBody"></tbody>
 </table>
-<div class="cards" id="finCorrel2Cards"></div>
+<div class="cards" id="finCorrel2FragCards"></div>
 
-<div class="quant-subblock-label">Cross-Basket Pairs — Rising (converging)</div>
+<div class="quant-subblock-label">Basket Cohesion — top 5 most-converging themes (thesis strengthening)</div>
+<table id="finCorrel2ConvTable">
+  <thead>
+    <tr>
+      <th data-key="Theme">Theme</th>
+      <th data-key="N_Stocks" class="num">N Stocks</th>
+      <th data-key="Cohesion_20D" class="num">Cohesion 20D</th>
+      <th data-key="Cohesion_60D" class="num">Cohesion 60D</th>
+      <th data-key="Cohesion_Delta" class="num">Cohesion Δ</th>
+    </tr>
+  </thead>
+  <tbody id="finCorrel2ConvBody"></tbody>
+</table>
+<div class="cards" id="finCorrel2ConvCards"></div>
+
+<div class="quant-subblock-label">Cross-Basket Pairs — top 3 Rising (converging)</div>
 <table id="finCorrel3RisingTable">
   <thead>
     <tr>
@@ -49,7 +80,7 @@
 </table>
 <div class="cards" id="finCorrel3RisingCards"></div>
 
-<div class="quant-subblock-label">Cross-Basket Pairs — Falling (decoupling)</div>
+<div class="quant-subblock-label">Cross-Basket Pairs — top 3 Falling (decoupling)</div>
 <table id="finCorrel3FallingTable">
   <thead>
     <tr>
