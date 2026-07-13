@@ -2777,6 +2777,7 @@ async function loadQuantStrategyTab(){
   mount.innerHTML = html;
   const s = document.createElement("script");
   s.src = "quant-strategy.js";
+  s.onload = () => { if(window.renderQuantStrategy) window.renderQuantStrategy(); };
   document.body.appendChild(s);
 }
 </script>
