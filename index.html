@@ -928,7 +928,7 @@
           <th data-key="TrendQuality" class="num">Trend</th>
           <th data-key="Absorption" class="num">Absorption</th>
           <th data-key="FollowThrough" class="num">Follow-Thru</th>
-          <th data-key="POC_Score" class="num">POC Score</th>
+          <th data-key="POC_15D" class="num">POC Value</th>
           <th data-key="Value_Discovery">Discovery</th>
           <th data-key="Composite_Score" class="num">Composite</th>
         </tr>
@@ -1593,9 +1593,9 @@ function closeTickerChart(){
   currentChartTicker = null;
 }
 
-  function alignSeriesToChart(pocSeries, chartDates){
+  function alignSeriesToChart(pocSeries, chartDates, field){
      const map = {};
-     pocSeries.dates.forEach((d,i) => map[d] = pocSeries.poc_15d[i]);
+     pocSeries.dates.forEach((d,i) => map[d] = pocSeries[field][i]);
      return chartDates.map(d => (d in map) ? map[d] : null);
    }
   
@@ -1623,12 +1623,20 @@ function closeTickerChart(){
         { label: "Close", data: series.close, borderColor: "#14171A", backgroundColor: "#14171A", borderWidth: 2, pointRadius: 0, tension: 0.1 },
         { label: "EMA 12", data: series.ema12, borderColor: "#2B6E63", backgroundColor: "#2B6E63", borderWidth: 1.5, pointRadius: 0, tension: 0.1 },
         { label: "EMA 26", data: series.ema26, borderColor: "#5B4B8A", backgroundColor: "#5B4B8A", borderWidth: 1.5, pointRadius: 0, tension: 0.1 },
-        {
+        
+     {
      label: "POC 15D",
      data: (finPocData && finPocData.series[currentChartTicker]) ?
-       alignSeriesToChart(finPocData.series[currentChartTicker], series.dates) : [],
+       alignSeriesToChart(finPocData.series[currentChartTicker], series.dates, "poc_15d") : [],
      borderColor: "#A8842B", backgroundColor: "#A8842B",
      borderWidth: 1.5, borderDash: [5,3], pointRadius: 0, tension: 0.1
+   },
+        {
+     label: "Cluster Ceiling",
+     data: (finPocData && finPocData.series[currentChartTicker]) ?
+       alignSeriesToChart(finPocData.series[currentChartTicker], series.dates, "cluster_ceiling") : [],
+     borderColor: "#2B6E63", backgroundColor: "#2B6E63",
+     borderWidth: 1.5, borderDash: [2,2], pointRadius: 0, tension: 0.1
    },
       ]
     },
@@ -2512,7 +2520,7 @@ function renderFinIdeasTable(){
       <td class="num">${fmt(r.TrendQuality,3)}</td>
       <td class="num">${fmt(r.Absorption,3)}</td>
       <td class="num">${fmt(r.FollowThrough,3)}</td>
-      <td class="num">${fmt(r.POC_Score,1)}</td>
+      <td class="num">₹${fmt(r.POC_15D,2)}</td>
       <td><span class="tag ${r.Value_Discovery ? 'Yes' : 'No'}">${r.Value_Discovery ? 'Yes' : 'No'}</span></td>
       <td class="num score-cell">${fmt(r.Composite_Score,1)}</td>
     </tr>`).join("");
@@ -2535,7 +2543,7 @@ function renderFinIdeasTable(){
         <span>Trend <b>${fmt(r.TrendQuality,3)}</b></span>
         <span>Absorption <b>${fmt(r.Absorption,3)}</b></span>
         <span>Follow-Thru <b>${fmt(r.FollowThrough,3)}</b></span>
-        <span>POC Score <b>${fmt(r.POC_Score,1)}</b></span>
+        <span>POC Value <b>₹${fmt(r.POC_15D,2)}</b></span>
       </div>
     </div>`).join("");
 }
