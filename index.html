@@ -2352,9 +2352,11 @@ const THEME_CONVICTION_URL = FINANCIALS_URL.replace("financials_baskets.json", "
 const COMPOSITE_IDEAS_URL = FINANCIALS_URL.replace("financials_baskets.json", "financials_composite_ideas.json");
 const FIN_PRICE_SERIES_URL = FINANCIALS_URL.replace("financials_baskets.json", "financials_price_series.json");
 const FIN_POC_URL = FINANCIALS_URL.replace("financials_baskets.json", "financials_poc.json");
+const FIN_SVDP_URL = FINANCIALS_URL.replace("financials_baskets.json", "financials_svdp_signals.json");
 
 let finData = null, finHealthData = null, finThemeData = null, finIdeasData = null;
-let finPriceSeriesData = {}, finPocData = null;
+let finPriceSeriesData = {}, finPocData = null, finSvdpData = null;
+let finSvdpSort = { key: "value_migration_score", dir: -1 };
 let finChartInstance = null, finHealthChartInstance = null;
 let finThemeExpanded = new Set();
 
@@ -2367,13 +2369,14 @@ const FIN_METRIC_LABELS = {
 
 async function loadFinancialsData(){
   try{
-    const [basketsRes, healthRes, themeRes, ideasRes, priceRes, pocRes] = await Promise.all([
+    const [basketsRes, healthRes, themeRes, ideasRes, priceRes, pocRes, svdpRes] = await Promise.all([
       fetch(FINANCIALS_URL, {cache:"no-store"}),
       fetch(SECTOR_HEALTH_URL, {cache:"no-store"}),
       fetch(THEME_CONVICTION_URL, {cache:"no-store"}),
       fetch(COMPOSITE_IDEAS_URL, {cache:"no-store"}),
       fetch(FIN_PRICE_SERIES_URL, {cache:"no-store"}),
       fetch(FIN_POC_URL, {cache:"no-store"}),
+      fetch(FIN_SVDP_URL, {cache:"no-store"}),
     ]);
     if(!basketsRes.ok) throw new Error(`baskets HTTP ${basketsRes.status}`);
     if(!healthRes.ok) throw new Error(`sector health HTTP ${healthRes.status}`);
@@ -2383,12 +2386,14 @@ async function loadFinancialsData(){
     finIdeasData = ideasRes.ok ? await ideasRes.json() : null;
     if(priceRes.ok){ const j = await priceRes.json(); finPriceSeriesData = j.series || {}; }
     if(pocRes.ok){ finPocData = await pocRes.json(); }
+    if(svdpRes.ok){ finSvdpData = await svdpRes.json(); }
 
     renderFinScoreBox();
     populateFinMetricSelect();
     renderFinHealthChart(document.getElementById("finMetricSelect").value);
     renderFinIdeasTable();
     renderFinThemeTable();
+    renderFinSvdpTable();
   }catch(err){
     document.getElementById("finScoreCommentary").textContent = `Could not load India Financials data: ${err.message}`;
   }
