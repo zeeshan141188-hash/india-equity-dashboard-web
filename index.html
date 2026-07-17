@@ -956,10 +956,28 @@
       <tbody id="finThemeBody"></tbody>
     </table>
     <div class="cards" id="finThemeCards"></div>
+
+    <div class="disp-subhead">Top 10 — Value Migration (POC/VAH ATR-Normalized Migration) · Click a row for chart</div>
+    <table id="finSvdpTable">
+      <thead>
+        <tr>
+          <th data-key="Ticker">Ticker</th>
+          <th data-key="Theme">Theme</th>
+          <th data-key="poc_price" class="num">POC Price</th>
+          <th data-key="vah" class="num">VAH</th>
+          <th data-key="val" class="num">VAL</th>
+          <th data-key="poc_migration_atr" class="num">POC Migration (ATR)</th>
+          <th data-key="close_above_poc_pct" class="num">Close &gt; POC %</th>
+          <th data-key="value_migration_score" class="num">Migration Score</th>
+        </tr>
+      </thead>
+      <tbody id="finSvdpBody"></tbody>
+    </table>
+    <div class="cards" id="finSvdpCards"></div>
+
     <div id="quantStrategyMount"></div>
 
   </div>
-
   <div id="finChartView" style="display:none;">
     <div class="fin-chart-header">
       <div>
@@ -1670,6 +1688,140 @@ document.getElementById("focusCards").addEventListener("click", (e)=>{
   openTickerChart(card.dataset.ticker);
 });
 
+// ---- Table: Value Migration (SDVP Stage 2) ----
+function tickerThemeLookup(ticker){
+  if(finIdeasData && finIdeasData.ideas){
+    const match = finIdeasData.ideas.find(r => r.Ticker === ticker || cleanTicker(r.Ticker) === ticker);
+    if(match) return match.Theme || "";
+  }
+  return "";
+}
+
+function renderFinSvdpTable(){
+  const body = document.getElementById("finSvdpBody");
+  const cardsEl = document.getElementById("finSvdpCards");
+
+  if(!finSvdpData || !finSvdpData.latest){
+    body.innerHTML = `<tr><td colspan="8" class="empty-state">No value migration data available.</td></tr>`;
+    cardsEl.innerHTML = `<div class="empty-state">No value migration data available.</div>`;
+    return;
+  }
+
+  let rows = Object.entries(finSvdpData.latest).map(([ticker, r]) => ({ Ticker: ticker, Theme: tickerThemeLookup(ticker), ...r }));
+  rows = sortFinRows(rows, finSvdpSort).slice(0, 10);
+
+  if(!rows.length){
+    body.innerHTML = `<tr><td colspan="8" class="empty-state">No value migration data available.</td></tr>`;
+    cardsEl.innerHTML = `<div class="empty-state">No value migration data available.</div>`;
+    return;
+  }
+
+  body.innerHTML = rows.map(r => `
+    <tr class="fin-table-row-clickable" data-ticker="${r.Ticker}">
+      <td class="ticker">${cleanTicker(r.Ticker)}</td>
+      <td>${r.Theme||""}</td>
+      <td class="num">₹${fmt(r.poc_price,2)}</td>
+      <td class="num">₹${fmt(r.vah,2)}</td>
+      <td class="num">₹${fmt(r.val,2)}</td>
+      <td class="num">${fmt(r.poc_migration_atr,2)}</td>
+      <td class="num">${fmt((r.close_above_poc_pct||0)*100,0)}%</td>
+      <td class="num score-cell">${fmt(r.value_migration_score,1)}</td>
+    </tr>`).join("");
+
+  cardsEl.innerHTML = rows.map(r => `
+    <div class="card fin-table-row-clickable" data-ticker="${r.Ticker}">
+      <div class="card-top">
+        <div>
+          <div class="card-ticker">${cleanTicker(r.Ticker)}</div>
+          <div class="card-name">${r.Theme||""}</div>
+        </div>
+        <div>
+          <div class="card-score">${fmt(r.value_migration_score,1)}</div>
+          <div class="card-score-label">Migration Score</div>
+        </div>
+      </div>
+      <div class="card-meta">
+        <span>POC <b>₹${fmt(r.poc_price,2)}</b></span>
+        <span>VAH <b>₹${fmt(r.vah,2)}</b></span>
+        <span>VAL <b>₹${fmt(r.val,2)}</b></span>
+        <span>POC Migration (ATR) <b>${fmt(r.poc_migration_atr,2)}</b></span>
+        <span>Close &gt; POC <b>${fmt((r.close_above_poc_pct||0)*100,0)}%</b></span>
+      </div>
+    </div>`).join("");
+}
+
+document.querySelectorAll("#finSvdpTable thead th").forEach(th => {
+  th.addEventListener("click", () => {
+    const key = th.dataset.key;
+    finSvdpSort.dir = (finSvdpSort.key === key) ? -finSvdpSort.dir : -1;
+    finSvdpSort.key = key;
+    renderFinSvdpTable();
+  });
+});
+
+document.getElementById("finSvdpBody").addEventListener("click", (e) => {
+  const row = e.target.closest("tr[data-ticker]");
+  if(!row) return;
+  openFinSvdpChart(row.dataset.ticker);
+});
+document.getElementById("finSvdpCards").addEventListener("click", (e) => {
+  const card = e.target.closest(".card[data-ticker]");
+  if(!card) return;
+  openFinSvdpChart(card.dataset.ticker);
+});
+
+function openFinSvdpChart(ticker){
+  const svdpSeries = finSvdpData && finSvdpData.series ? finSvdpData.series[ticker] : null;
+  const closeSeries = finPriceSeriesData ? finPriceSeriesData[ticker] : null;
+
+  if(!svdpSeries || !svdpSeries.dates || !svdpSeries.dates.length){
+    document.getElementById("finGridView").style.display = "none";
+    document.getElementById("finChartView").style.display = "block";
+    document.getElementById("finChartTitle").textContent = cleanTicker(ticker);
+    document.getElementById("finChartSub").textContent = "No value migration chart data yet for this ticker.";
+    if(finChartInstance){ finChartInstance.destroy(); finChartInstance = null; }
+    return;
+  }
+
+  let closeAligned = [];
+  if(closeSeries && closeSeries.dates){
+    const closeMap = {};
+    closeSeries.dates.forEach((d, i) => closeMap[d] = closeSeries.close[i]);
+    closeAligned = svdpSeries.dates.map(d => (d in closeMap) ? closeMap[d] : null);
+  }
+
+  showFinMultiChart(
+    cleanTicker(ticker),
+    `${tickerThemeLookup(ticker) || "India Financials"} · Close / POC / VAH / VAL · 1-year`,
+    svdpSeries.dates,
+    [
+      { label: "Close", data: closeAligned, borderColor: "#14171A", backgroundColor: "#14171A", borderWidth: 2, pointRadius: 0, tension: 0.1 },
+      { label: "POC", data: svdpSeries.poc_price, borderColor: "#A8842B", backgroundColor: "#A8842B", borderWidth: 1.5, borderDash: [5,3], pointRadius: 0, tension: 0.1 },
+      { label: "VAH", data: svdpSeries.vah, borderColor: "#2B6E63", backgroundColor: "#2B6E63", borderWidth: 1.5, borderDash: [2,2], pointRadius: 0, tension: 0.1 },
+      { label: "VAL", data: svdpSeries.val, borderColor: "#5B4B8A", backgroundColor: "#5B4B8A", borderWidth: 1.5, borderDash: [2,2], pointRadius: 0, tension: 0.1 },
+    ]
+  );
+}
+
+function showFinMultiChart(title, sub, dates, datasets){
+  document.getElementById("finGridView").style.display = "none";
+  document.getElementById("finChartView").style.display = "block";
+  document.getElementById("finChartTitle").textContent = title;
+  document.getElementById("finChartSub").textContent = sub;
+  if(finChartInstance) finChartInstance.destroy();
+  finChartInstance = new Chart(document.getElementById("finChart").getContext("2d"), {
+    type: "line",
+    data: { labels: dates, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: true, position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y !== null ? '₹'+ctx.parsed.y.toFixed(2) : "—"}` } }
+      },
+      scales: { x: { ticks: { maxTicksLimit: 7, font: { size: 10 } } }, y: { ticks: { font: { size: 10 } } } }
+    }
+  });
+}
 document.getElementById("dispUpBody").addEventListener("click", (e)=>{
   const row = e.target.closest("tr[data-ticker]");
   if(!row) return;
